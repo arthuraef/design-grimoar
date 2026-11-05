@@ -1,0 +1,26 @@
+# Environment & Secrets
+.env
+.env.local
+*.env
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Builds
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# OS & IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Database & Cache
+pgdata/
+data/
+*.pid

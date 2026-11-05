@@ -1,0 +1,66 @@
+# Configuração do DeepSeek Harness (dsh) & Cordis Framework
+# Projeto: Design Grimoar
+
+name: design-grimoar-orchestrator
+version: 1.0.0
+
+# Plugins e Extensões do Cordis / DSH
+plugins:
+  - name: './src/plugins/plugin-ingestor'
+    config:
+      similarityThreshold: 0.82
+      autoProcessSources: true
+      firecrawlApiUrl: 'https://api.firecrawl.dev'
+
+  - name: './src/plugins/plugin-synthesizer'
+    config:
+      promptPath: './prompts/step2-lexicographer.md'
+      temperature: 0.2
+      model: 'deepseek-chat'
+
+  - name: './src/plugins/plugin-academic-validator'
+    config:
+      promptPath: './prompts/step3-academic-auditor.md'
+      temperature: 0.1
+      model: 'deepseek-reasoner' # Ou modelo independente verifier (ex: gpt-4o)
+
+  - name: '@deepseek-ai/dsh-tool-fs'
+    config:
+      baseDir: './taxonomia'
+      readOnly: false
+
+  - name: '@deepseek-ai/dsh-schedule'
+    config:
+      timezone: 'America/Sao_Paulo'
+
+# Regras de isolamento de pipelines e loop de verificação
+pipeline:
+  stage1:
+    name: 'Ingestão Determinística (plugin-ingestor)'
+    deterministic: true
+    tools: ['firecrawl-mcp', 'vibevoice-asr']
+    promptInjectionProtection: true
+    allowGithubToken: false # Hard gate de segurança: Least Privilege
+    canonicalSources:
+      web: 7
+      audio: 'UXPodcast'
+
+  verificationLoop:
+    name: 'Loop de Refinamento e Validação (Generator-Verifier)'
+    maxAttempts: 3
+    generator:
+      plugin: 'plugin-synthesizer'
+      systemPrompt: './prompts/step2-lexicographer.md'
+    verifier:
+      plugin: 'plugin-academic-validator'
+      systemPrompt: './prompts/step3-academic-auditor.md'
+      independentCall: true # Isolamento Generator-Verifier
+    linter:
+      module: './src/schema.ts'
+      schema: 'Zod'
+      mandatorySections: 5
+
+  stage5:
+    name: 'Commit Canônico & Wiki SSOT'
+    deterministic: true
+    target: './taxonomia'

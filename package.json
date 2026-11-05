@@ -1,0 +1,40 @@
+{
+  "name": "design-grimoar",
+  "version": "1.0.0",
+  "description": "Base de Conhecimento e Orquestrador Multiagente do Design Grimoar para Oracle Cloud ARM",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "validate:schema": "tsx src/schema.ts",
+    "test": "tsx src/test-schema.ts && tsx src/test-ingestor.ts && tsx src/test-verification-loop.ts",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "design",
+    "design-system",
+    "product-design",
+    "agents",
+    "dsh",
+    "cordis",
+    "pgvector"
+  ],
+  "author": "Arthur AEF",
+  "license": "MIT",
+  "dependencies": {
+    "@deepseek-ai/cordis": "^4.1.0",
+    "@deepseek-ai/dsh": "^0.2.2-rc.1",
+    "dotenv": "^16.4.5",
+    "pg": "^8.12.0",
+    "pgvector": "^0.1.8",
+    "yaml": "^2.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.6",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.2"
+  }
+}
