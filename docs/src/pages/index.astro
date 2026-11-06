@@ -4,7 +4,12 @@ import { getCollection } from 'astro:content';
 
 let allVerbetes: any[] = [];
 try {
-  allVerbetes = await getCollection('docs');
+  const rawVerbetes = await getCollection('docs');
+  allVerbetes = rawVerbetes.filter((v: any) => {
+    const status = v.data?.status;
+    const auditStatus = v.data?.audit?.status;
+    return (status === 'canonical' || status === 'audited') && auditStatus === 'APPROVED';
+  });
 } catch (e) {
   allVerbetes = [];
 }

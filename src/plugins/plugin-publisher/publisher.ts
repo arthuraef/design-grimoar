@@ -157,6 +157,7 @@ export class PublisherService {
       let results: string[] = [];
       const list = fs.readdirSync(dir, { withFileTypes: true });
       for (const entry of list) {
+        if (entry.name.startsWith('.') || entry.name.startsWith('_')) continue;
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
           results = results.concat(findMarkdownFiles(fullPath));
@@ -179,6 +180,12 @@ export class PublisherService {
         }
 
         const frontmatter = validation.frontmatter;
+
+        // Gate Estrito (Objetivo 6): Apenas verbetes com status 'canonical' e auditoria 'APPROVED' são indexados
+        if (frontmatter.status !== 'canonical' || frontmatter.audit?.status !== 'APPROVED') {
+          console.log(`[Publisher - Bootstrap]: Ignorando verbete não-canônico: "${frontmatter.title}" (status: ${frontmatter.status}, audit: ${frontmatter.audit?.status})`);
+          continue;
+        }
 
         // Se tiver pool do Postgres, verificar se já está indexado
         if (this.pool) {
@@ -208,9 +215,44 @@ export class PublisherService {
 
   /**
    * Executa a publicação atômica completa do verbete validado
+   * Cumpre o Objetivo 6: Impeça que verbetes in_review, reprovados ou sem auditoria
+   * integrem a publicação canônica ou a busca pública.
    */
   async publish(frontmatter: VerbeteFrontmatter, markdownContent: string): Promise<PublishResult> {
-    console.log(`\n📦 [Publisher]: Iniciando publicação atômica de "${frontmatter.title}" (${frontmatter.slug})...`);
+    console.log(`\n📦 [Publisher]: Iniciando processamento de publicação de "${frontmatter.title}" (${frontmatter.slug})...`);
+
+    // Gate de Publicação Canônica (Objetivo 6)
+    const isApprovedCanonical = 
+      (frontmatter.status === 'canonical' || frontmatter.status === 'audited') && 
+      frontmatter.audit?.status === 'APPROVED';
+
+    if (!isApprovedCanonical) {
+      console.warn(
+        `🛡️ [Publisher - Gate]: Verbete "${frontmatter.title}" não possui aprovação canônica ` +
+        `(status: "${frontmatter.status}", audit: "${frontmatter.audit?.status}"). ` +
+        `Preservando exclusivamente no ambiente de revisão/staging (taxonomia/_staging/). Publicação pública bloqueada.`
+      );
+
+      const stagingDir = path.resolve('taxonomia', '_staging');
+      if (!fs.existsSync(stagingDir)) {
+        fs.mkdirSync(stagingDir, { recursive: true });
+      }
+      const stagingFilePath = path.join(stagingDir, `${frontmatter.slug}.md`);
+      fs.writeFileSync(stagingFilePath, markdownContent, 'utf-8');
+
+      return {
+        success: true,
+        filePath: stagingFilePath,
+        staticSitePath: undefined,
+        commitHash: '0000000000000000000000000000000000000000',
+        commitMessage: `chore(staging): [in_review] ${frontmatter.title} retido em staging para revisão`,
+        pushed: false,
+        vectorUpdated: false,
+        chunksIndexed: 0,
+        staticSiteSynced: false,
+        publishedAt: new Date().toISOString(),
+      };
+    }
 
     // 1. Gravação Canônica do Arquivo no Sistema de Arquivos (SSOT)
     const targetDir = path.resolve('taxonomia', frontmatter.domain, frontmatter.subdomain);

@@ -48,6 +48,52 @@ export const AuditStatusEnum = z.preprocess((val) => {
 ]));
 
 /**
+ * Tipos de Relações Semânticas Tipadas entre Verbetes
+ * Impede a fusão destrutiva de conceitos mantendo grafos ontológicos tipados.
+ */
+export const RelationTypeEnum = z.enum([
+  'distinguished_from', // Distinção conceitual estrita (ex: Affordance != Signifier)
+  'complements', // Conceito complementar em produto/interface
+  'subconcept_of', // Especialização ontológica
+  'influences', // Relação causal ou de impacto (ex: Cognitive Load influences Usability)
+  'prerequisite_for', // Dependência conceitual prévia
+  'related_to', // Relação associativa geral
+]);
+
+export type RelationType = z.infer<typeof RelationTypeEnum>;
+
+export const TypedRelationSchema = z.preprocess((val: any) => {
+  if (val && typeof val === 'object') {
+    return {
+      target_slug: val.target_slug || val.target_concept,
+      relation_type: val.relation_type,
+      description: val.description || val.rationale,
+    };
+  }
+  return val;
+}, z.object({
+  target_slug: z.string().min(2, 'Slug de destino é obrigatório'),
+  relation_type: RelationTypeEnum,
+  description: z.string().min(5, 'Descrição da relação conceitual é obrigatória'),
+}));
+
+export type TypedRelation = z.infer<typeof TypedRelationSchema>;
+
+/**
+ * Metadados de Proveniência e Auditoria de Origem (Objetivo 3)
+ */
+export const ProvenanceSchema = z.object({
+  source_url: z.string().optional(),
+  extracted_at: z.string().optional().default(() => new Date().toISOString()),
+  curator_version: z.string().default('2.0.0'),
+  agent_pipeline: z.string().default('deepseek-cordis-v2'),
+  origin_entity: z.string().optional(),
+  previous_commit_hash: z.string().optional(),
+});
+
+export type Provenance = z.infer<typeof ProvenanceSchema>;
+
+/**
  * Schema de Auditoria Acadêmica
  */
 export const VerbeteAuditSchema = z.object({
@@ -55,6 +101,16 @@ export const VerbeteAuditSchema = z.object({
   auditor: z.string().default('academic-auditor-v1'),
   audited_at: z.string().datetime({ offset: true }).optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}T.*Z$/)).or(z.string().min(10).optional()),
   academic_anchor_added: z.array(z.string()).default([]),
+  claims_audited: z
+    .array(
+      z.object({
+        claim: z.string(),
+        anchor: z.string(),
+        verified: z.boolean(),
+        justification: z.string(),
+      })
+    )
+    .optional(),
   notes: z.string().optional(),
 });
 
@@ -120,6 +176,17 @@ export const VerbeteFrontmatterSchema = z.object({
   cross_references: z
     .array(z.string().regex(/^\[\[.+\]\]$/, 'Referências cruzadas devem usar formato WikiLink: [[NomeDoVerbete]]'))
     .default([]),
+  // Identidade Canônica Estrita e Relações Tipadas (Objetivos 2 e 3)
+  canonical_id: z.string().optional(),
+  original_term: z.string().optional(),
+  definition_core: z.string().optional(),
+  scope: z.string().optional(),
+  distinction_criteria: z.preprocess((val) => {
+    if (typeof val === 'string') return [val];
+    return val;
+  }, z.array(z.string()).default([])),
+  typed_relations: z.array(TypedRelationSchema).default([]),
+  provenance: ProvenanceSchema.optional(),
 });
 
 export type VerbeteFrontmatter = z.infer<typeof VerbeteFrontmatterSchema>;

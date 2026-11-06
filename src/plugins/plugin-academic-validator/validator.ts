@@ -2,9 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { resolvePromptFile, sanitizeBaseUrl } from '../plugin-synthesizer/synthesizer.js';
 
+export interface AuditedClaim {
+  claim: string;
+  anchor: string;
+  verified: boolean;
+  justification: string;
+}
+
 export interface AcademicAuditResult {
   status: 'APPROVED' | 'REJECTED';
   academic_anchor_added: string[];
+  claims_audited?: AuditedClaim[];
   audited_markdown: string;
   critique?: string;
 }
@@ -135,6 +143,7 @@ export class AcademicValidatorService {
       return {
         status: parsed.status === 'APPROVED' ? 'APPROVED' : 'REJECTED',
         academic_anchor_added: Array.isArray(parsed.academic_anchor_added) ? parsed.academic_anchor_added : [],
+        claims_audited: Array.isArray(parsed.claims_audited) ? parsed.claims_audited : [],
         audited_markdown: parsed.audited_markdown || fallbackDraft,
         critique: parsed.critique || parsed.reason,
       };
@@ -144,12 +153,39 @@ export class AcademicValidatorService {
   }
 
   /**
-   * Auditoria determinística para verificação de escopo e literatura científica sem LLM ativo
+   * Auditoria determinística para verificação de escopo, rastreabilidade epistêmica e literatura científica
    */
   public deterministicAudit(draftMarkdown: string): AcademicAuditResult {
     const lower = draftMarkdown.toLowerCase();
 
-    // Critério 1: Escopo (Product Design, UX/UI, Design Systems, DesignOps, Psicologia Cognitiva)
+    // 1. Verificação de Divergência Conceitual entre Título e Definição
+    const titleMatch = draftMarkdown.match(/title:\s*["']?([^"'\r\n]+)["']?/i);
+    const title = titleMatch ? titleMatch[1].trim() : '';
+    const titleLower = title.toLowerCase();
+
+    const sec1Match = draftMarkdown.match(/# 1\. Definição Canônica\s*([\s\S]*?)(?=(# 2\.|$))/i);
+    const sec1 = sec1Match ? sec1Match[1].trim() : '';
+    const sec1Lower = sec1.toLowerCase();
+
+    // Rejeição estrita se o título é Usabilidade Cognitiva mas a definição define Affordance
+    if (!titleLower.includes('affordance') && (sec1Lower.startsWith('*affordance*') || sec1Lower.startsWith('affordance'))) {
+      return {
+        status: 'REJECTED',
+        academic_anchor_added: [],
+        claims_audited: [
+          {
+            claim: `Definição Canônica do verbete "${title}"`,
+            anchor: 'Inconsistência Epistêmica Título-Definição',
+            verified: false,
+            justification: `O verbete intitulado "${title}" apresenta uma definição canônica de Affordance em vez do conceito do título.`,
+          },
+        ],
+        audited_markdown: draftMarkdown,
+        critique: `[Contaminação Conceitual]: O verbete intitulado "${title}" apresenta uma definição canônica de Affordance em vez do conceito do título.`,
+      };
+    }
+
+    // 2. Critério de Escopo Geral
     const validScopeKeywords = [
       'product design', 'ux', 'ui', 'design system', 'designops', 'psicologia cognitiva',
       'usabilidade', 'interação', 'affordance', 'signifier', 'heuristic', 'interface'
@@ -165,9 +201,32 @@ export class AcademicValidatorService {
       };
     }
 
-    // Critério 2: Âncoras acadêmicas (Nielsen, Norman, Gestalt, Sweller, Fogg, ISO 9241, Gibson)
+    // 3. Rastreabilidade Epistêmica: Proibição de Falsa Atribuição ("Name Dropping")
+    if (titleLower.includes('affordance') || sec1Lower.includes('affordance')) {
+      if (lower.includes('sweller') || lower.includes('cognitive load theory')) {
+        return {
+          status: 'REJECTED',
+          academic_anchor_added: [],
+          audited_markdown: draftMarkdown,
+          critique: 'Inconsistência epistêmica: John Sweller (Cognitive Load Theory) atribuído indevidamente ao verbete de Affordance. Gibson (1979) e Norman (1988) são as autoridades canônicas.',
+        };
+      }
+    }
+
+    if (titleLower.includes('cognitive load') || titleLower.includes('carga cognitiva')) {
+      if (lower.includes('gibson') && !lower.includes('sweller')) {
+        return {
+          status: 'REJECTED',
+          academic_anchor_added: [],
+          audited_markdown: draftMarkdown,
+          critique: 'Inconsistência epistêmica: James J. Gibson (Psicologia Ecológica/Affordance) não fundamenta a Teoria da Carga Cognitiva. Sweller (1988) e Paas são os autores fundamentais.',
+        };
+      }
+    }
+
+    // 4. Âncoras acadêmicas comprovadas
     const academicAuthorities = [
-      'norman', 'nielsen', 'gestalt', 'sweller', 'fogg', 'iso 9241', 'gibson', 'shneiderman', 'fitts', 'hick'
+      'norman', 'nielsen', 'gestalt', 'sweller', 'fogg', 'iso 9241', 'gibson', 'shneiderman', 'fitts', 'hick', 'yablonski'
     ];
     const matchedAnchors = academicAuthorities.filter((auth) => lower.includes(auth));
 
@@ -183,6 +242,12 @@ export class AcademicValidatorService {
     return {
       status: 'APPROVED',
       academic_anchor_added: matchedAnchors.map((a) => `Literatura comprovada: ${a.toUpperCase()}`),
+      claims_audited: matchedAnchors.map((a) => ({
+        claim: `Fundamentação teórica do verbete ${title || 'canônico'}`,
+        anchor: a.toUpperCase(),
+        verified: true,
+        justification: `Literatura científica canônica de ${a.toUpperCase()} comprovada para o escopo avaliado.`,
+      })),
       audited_markdown: draftMarkdown,
     };
   }

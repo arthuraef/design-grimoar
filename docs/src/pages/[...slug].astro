@@ -4,7 +4,12 @@ import { getCollection, render } from 'astro:content';
 
 export async function getStaticPaths() {
   const docs = await getCollection('docs');
-  return docs.map((doc) => {
+  const canonicalDocs = docs.filter((doc) => {
+    const status = doc.data?.status;
+    const auditStatus = doc.data?.audit?.status;
+    return (status === 'canonical' || status === 'audited') && auditStatus === 'APPROVED';
+  });
+  return canonicalDocs.map((doc) => {
     const slug = doc.data.slug || doc.id.replace(/\.md$/, '');
     return {
       params: { slug },

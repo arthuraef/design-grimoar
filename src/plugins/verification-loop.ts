@@ -1,12 +1,14 @@
 import { SynthesizerService, SynthesizerInput, CorrectionFeedback } from './plugin-synthesizer/synthesizer.js';
 import { AcademicValidatorService, AcademicAuditResult } from './plugin-academic-validator/validator.js';
 import { validateVerbete, VerbeteFrontmatter, ValidationResult } from '../schema.js';
+import { SemanticIntegrityGate, SemanticIntegrityResult } from './semantic-integrity-gate.js';
 
 export interface LoopAttemptRecord {
   attempt: number;
   draftMarkdown: string;
   auditResult?: AcademicAuditResult;
   zodResult?: ValidationResult;
+  integrityResult?: SemanticIntegrityResult;
   passed: boolean;
   failureReason?: string;
 }
@@ -17,6 +19,7 @@ export interface VerificationLoopResult {
   finalMarkdown: string;
   frontmatter: VerbeteFrontmatter;
   auditResult: AcademicAuditResult;
+  integrityResult?: SemanticIntegrityResult;
   history: LoopAttemptRecord[];
 }
 
@@ -24,25 +27,29 @@ export interface VerificationLoopOptions {
   maxAttempts?: number;
   synthesizer?: SynthesizerService;
   validator?: AcademicValidatorService;
+  integrityGate?: SemanticIntegrityGate;
 }
 
 export const DEFAULT_MAX_ATTEMPTS = 3;
 
 /**
- * Controlador do Loop de Verificação (Lexicógrafo -> Auditor Acadêmico -> Zod Schema)
+ * Controlador do Loop de Verificação (Lexicógrafo -> Auditor Acadêmico -> Zod Schema -> Semantic Integrity Gate)
  * 
  * Regra Inegociável 2: Isolamento Generator-Verifier.
  * Regra Inegociável 4: Hard Gate Zod determinístico.
+ * Objetivo 4: Semantic Integrity Gate determinístico anti-contaminação.
  * Limite estrito de 3 tentativas antes de rejeição definitiva.
  */
 export class VerificationLoopController {
   private synthesizer: SynthesizerService;
   private validator: AcademicValidatorService;
+  private integrityGate: SemanticIntegrityGate;
   private maxAttempts: number;
 
   constructor(options: VerificationLoopOptions = {}) {
     this.synthesizer = options.synthesizer || new SynthesizerService();
     this.validator = options.validator || new AcademicValidatorService();
+    this.integrityGate = options.integrityGate || new SemanticIntegrityGate();
     this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   }
 
@@ -127,16 +134,52 @@ export class VerificationLoopController {
 
       console.log(`✅ [Tentativa ${attempt}]: Aprovado pelo linter Zod e todas as 5 seções obrigatórias presentes!`);
 
-      // 4. SUCESSO COMPLETO: Consolidar Metadados no Frontmatter
+      // 4. VERIFICAÇÃO 3: Semantic Integrity Gate (Objetivo 4)
+      console.log(`🛡️ [Tentativa ${attempt}]: Submetendo ao Semantic Integrity Gate...`);
+      const integrityResult = this.integrityGate.evaluate(zodResult.frontmatter, auditResult.audited_markdown);
+
+      if (!integrityResult.passed) {
+        const failureReason = `[Inconsistência Semântica]: ${integrityResult.criticalInconsistencies.join('; ')}`;
+        console.warn(`❌ [Tentativa ${attempt}]: ${failureReason}`);
+
+        history.push({
+          attempt,
+          draftMarkdown,
+          auditResult,
+          zodResult,
+          integrityResult,
+          passed: false,
+          failureReason,
+        });
+
+        if (attempt < this.maxAttempts) {
+          console.log(`⚠️ [Loop]: Reenviando automaticamente para o Lexicógrafo com feedback do Semantic Integrity Gate...`);
+          feedback = {
+            attempt: attempt + 1,
+            zodErrors: integrityResult.criticalInconsistencies,
+            previousDraft: auditResult.audited_markdown,
+          };
+          continue;
+        } else {
+          throw new Error(
+            `[Loop de Verificação Esgotado]: Reprovado pelo Semantic Integrity Gate após ${this.maxAttempts} tentativas.\nInconsistências:\n* ${integrityResult.criticalInconsistencies.join('\n* ')}`
+          );
+        }
+      }
+
+      console.log(`✅ [Tentativa ${attempt}]: Aprovado pelo Semantic Integrity Gate (Score: ${integrityResult.score}/100)!`);
+
+      // 5. SUCESSO COMPLETO: Consolidar Metadados no Frontmatter Canônico
       const updatedFrontmatter: VerbeteFrontmatter = {
         ...zodResult.frontmatter,
-        status: 'audited',
+        status: 'canonical',
         audit: {
           status: 'APPROVED',
           auditor: 'academic-auditor-v1',
           audited_at: new Date().toISOString(),
           academic_anchor_added: auditResult.academic_anchor_added,
-          notes: `Aprovado na tentativa ${attempt} de ${this.maxAttempts}`,
+          claims_audited: auditResult.claims_audited,
+          notes: `Aprovado pelo Auditor e Semantic Integrity Gate (Tentativa ${attempt}/${this.maxAttempts})`,
         },
       };
 
@@ -145,6 +188,7 @@ export class VerificationLoopController {
         draftMarkdown: auditResult.audited_markdown,
         auditResult,
         zodResult,
+        integrityResult,
         passed: true,
       });
 
@@ -156,6 +200,7 @@ export class VerificationLoopController {
         finalMarkdown: auditResult.audited_markdown,
         frontmatter: updatedFrontmatter,
         auditResult,
+        integrityResult,
         history,
       };
     }

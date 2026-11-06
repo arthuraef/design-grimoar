@@ -63,6 +63,8 @@ async function runPublisherNotifierTests() {
       },
     ],
     cross_references: ['[[Affordance]]', '[[Feedback Loop]]'],
+    distinction_criteria: [],
+    typed_relations: [],
   };
 
   const testMarkdown = `---

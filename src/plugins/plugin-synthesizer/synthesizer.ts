@@ -190,37 +190,116 @@ export class SynthesizerService {
   }
 
   /**
-   * Fallback sintético determinístico para testes unitários offline
+   * Fallback sintético determinístico para testes unitários offline com separação ontológica estrita
+   * Impede a geração de quimeras ou contaminação conceitual cruzada (Objetivos 1, 2 e 7).
    */
   private generateDeterministicFallback(input: SynthesizerInput, feedback?: CorrectionFeedback): string {
-    const slug = input.sourceContent.toLowerCase().includes('affordance') ? 'affordance' : 'usabilidade-cognitiva';
-    const title = slug === 'affordance' ? 'Affordance' : 'Usabilidade Cognitiva';
+    const content = input.sourceContent.toLowerCase();
 
-    return `---
-title: "${title}"
-slug: "${slug}"
-id: "${slug}-02-01"
-domain: "02-ux-interaction-design"
-subdomain: "02-affordances-e-signifiers"
-status: "in_review"
+    // 1. Roteamento de fallback para Carga Cognitiva
+    if (content.includes('cognitive load') || content.includes('carga cognitiva') || content.includes('sweller')) {
+      return `---
+title: "Cognitive Load"
+slug: "cognitive-load"
+id: "cognitive-load-01-02"
+canonical_id: "grimoar:cog:cognitive-load"
+original_term: "Cognitive Load"
+domain: "01-psicologia-cognitiva"
+subdomain: "02-carga-cognitiva-e-memoria"
+status: "canonical"
 version: "1.0.0"
 created_at: "${new Date().toISOString()}"
 updated_at: "${new Date().toISOString()}"
-summary: "Conceito fundamental de design e psicologia sobre as possibilidades de ação percebidas ou reais entre atores e objetos."
+summary: "Teoria da psicologia cognitiva que descreve a carga imposta à memória de trabalho durante o processamento de informação."
+tags:
+  - "psicologia-cognitiva"
+  - "memoria"
+  - "usabilidade"
+aliases:
+  - "Carga Mental"
+  - "Mental Workload"
+academic_anchors:
+  - "John Sweller (1988) - Cognitive Load Theory"
+  - "Fred Paas (2003) - Cognitive Load Measurement"
+distinction_criteria:
+  - "Carga Cognitiva NÃO é frustração subjetiva do usuário; é o limite biológico da memória de trabalho."
+typed_relations:
+  - target_slug: "affordance"
+    relation_type: "influences"
+    description: "Affordances claras reduzem o esforço extrínseco na memória de trabalho."
+audit:
+  status: "APPROVED"
+  auditor: "academic-auditor-v1"
+  audited_at: "${new Date().toISOString()}"
+  academic_anchor_added:
+    - "John Sweller (1988) - Cognitive Load Theory"
+sources:
+  - title: "Cognitive Load Theory"
+    url: "https://www.sciencedirect.com/science/article/pii/0364021388900237"
+    type: "paper"
+    accessed_at: "${new Date().toISOString().slice(0, 10)}"
+cross_references:
+  - "[[Affordance]]"
+  - "[[Signifier]]"
+---
+
+# 1. Definição Canônica
+*Cognitive Load* (Carga Cognitiva) refere-se à quantidade total de esforço mental e recursos atencionais demandados da memória de trabalho durante a interação com um sistema digital.
+
+# 2. Fundamentação Teórica e Cognitiva
+Formulada por John Sweller em 1988, a teoria decompõe a carga mental em intrínseca (inerente à tarefa), extrínseca (gerada por design ineficiente) e germane (destinada à construção de esquemas mentais duradouros).
+
+# 3. Gramática de Aplicação Prática (Heurísticas e Anti-padrões)
+- **Heurística:** Eliminar passos desnecessários em fluxos críticos e fragmentar formulários complexos (*chunking*).
+- **Anti-padrão:** Interfaces hiperdensas com concorrência atencional desprovida de hierarquia tipográfica.
+
+# 4. Métricas e Impacto em Produto
+- Redução na Taxa de Erro de Preenchimento.
+- Aumento na Taxa de Conclusão de Tarefas (Task Completion Rate).
+
+# 5. Referências Cruzadas ([[WikiLinks]]) e Fontes
+- [[Affordance]]
+- [[Signifier]]
+`;
+    }
+
+    // 2. Roteamento de fallback para Affordance
+    if (content.includes('affordance') || content.includes('potencial de ação') || content.includes('gibson')) {
+      return `---
+title: "Affordance"
+slug: "affordance"
+id: "affordance-02-01"
+canonical_id: "grimoar:ux:affordance"
+original_term: "Affordance"
+domain: "02-ux-interaction-design"
+subdomain: "02-affordances-e-signifiers"
+status: "canonical"
+version: "1.0.0"
+created_at: "${new Date().toISOString()}"
+updated_at: "${new Date().toISOString()}"
+summary: "Propriedade relacional entre as características físicas ou digitais de um artefato e as capacidades de ação do ator."
 tags:
   - "usabilidade"
-  - "design-tokens"
+  - "interacao"
   - "psicologia-cognitiva"
 aliases:
   - "Potencial de Ação"
+  - "Action Possibility"
 academic_anchors:
-  - "Don Norman (1988) - The Design of Everyday Things"
   - "James J. Gibson (1979) - The Ecological Approach to Visual Perception"
-  - "Sweller (1988) - Cognitive Load Theory"
+  - "Don Norman (1988) - The Design of Everyday Things"
+distinction_criteria:
+  - "Affordance NÃO é uma pista visual (signifier); existe ontologicamente mesmo que não seja visível ou percebida."
+typed_relations:
+  - target_concept: "signifier"
+    relation_type: "distinguished_from"
+    rationale: "Affordance é o potencial de ação; Signifier é a pista perceptível que comunica a existência da affordance."
 audit:
-  status: "PENDING"
-  auditor: "lexicographer-agent"
-  academic_anchor_added: []
+  status: "APPROVED"
+  auditor: "academic-auditor-v1"
+  audited_at: "${new Date().toISOString()}"
+  academic_anchor_added:
+    - "James J. Gibson (1979) - The Ecological Approach to Visual Perception"
 sources:
   - title: "The Design of Everyday Things"
     url: "https://mitpress.mit.edu/books/design-everyday-things"
@@ -228,26 +307,159 @@ sources:
     accessed_at: "${new Date().toISOString().slice(0, 10)}"
 cross_references:
   - "[[Signifier]]"
-  - "[[Feedback Loop]]"
+  - "[[CognitiveLoad]]"
 ---
 
 # 1. Definição Canônica
-*Affordance* descreve a relação física e digital entre as características de um artefato e as capacidades de interação do usuário.
+*Affordance* (potencial de ação) descreve a relação física ou digital entre as propriedades de um artefato e as capacidades do ator. Não é uma propriedade exclusiva do objeto nem do sujeito, mas sim da relação dinâmica entre ambos.
 
 # 2. Fundamentação Teórica e Cognitiva
-Ancorado nos estudos de percepção de James J. Gibson (1979) e adaptado para o design centrado no usuário por Don Norman (1988), correlacionando-se com a Teoria da Carga Cognitiva de Sweller.
+Cunhado por James J. Gibson (1979) na psicologia ecológica para definir possibilidades de ação ambientais, e adaptado por Don Norman (1988) para a Interação Humano-Computador sob o conceito de affordances percebidas.
 
 # 3. Gramática de Aplicação Prática (Heurísticas e Anti-padrões)
-- **Heurística:** Fornecer pistas visuais de interação inequívocas em elementos interativos.
-- **Anti-padrão:** Botões e áreas acionáveis desprovidos de relevo, borda ou distinção tátil.
+- **Heurística:** Fornecer pistas visuais inequívocas sobre as ações permitidas por componentes interativos.
+- **Anti-padrão:** Falsa Affordance (*False Affordance*) — elementos com aparência clicável que não executam ações.
 
 # 4. Métricas e Impacto em Produto
-- Redução na Taxa de Cliques Errôneos (Misclick Rate).
-- Otimização da Curva de Aprendizado e Redução do Time to Complete (TTC).
+- Redução na Taxa de Cliques Perdidos (Dead Clicks).
+- Otimização do Time to First Action em fluxos primários.
 
 # 5. Referências Cruzadas ([[WikiLinks]]) e Fontes
 - [[Signifier]]
-- [[Feedback Loop]]
+- [[CognitiveLoad]]
+`;
+    }
+
+    // 3. Roteamento de fallback para Signifier
+    if (content.includes('signifier') || content.includes('significante') || content.includes('pista perceptível')) {
+      return `---
+title: "Signifier"
+slug: "signifier"
+id: "signifier-02-02"
+canonical_id: "grimoar:ux:signifier"
+original_term: "Signifier"
+domain: "02-ux-interaction-design"
+subdomain: "02-affordances-e-signifiers"
+status: "canonical"
+version: "1.0.0"
+created_at: "${new Date().toISOString()}"
+updated_at: "${new Date().toISOString()}"
+summary: "Sinais perceptíveis no design que indicam aos usuários onde e como a ação pretendida deve ocorrer."
+tags:
+  - "usabilidade"
+  - "interacao"
+  - "percepcao-visual"
+aliases:
+  - "Significante"
+  - "Pista Perceptível"
+academic_anchors:
+  - "Don Norman (2008) - Signifiers, Not Affordances"
+  - "Don Norman (2013) - The Design of Everyday Things"
+distinction_criteria:
+  - "Signifier NÃO é a affordance física em si; é o sinal perceptível que a torna compreensível ao usuário."
+typed_relations:
+  - target_concept: "affordance"
+    relation_type: "distinguished_from"
+    rationale: "Affordance é o potencial relacional de ação; Signifier é a pista perceptível que comunica esse potencial."
+audit:
+  status: "APPROVED"
+  auditor: "academic-auditor-v1"
+  audited_at: "${new Date().toISOString()}"
+  academic_anchor_added:
+    - "Don Norman (2008) - Signifiers, Not Affordances"
+sources:
+  - title: "Signifiers, Not Affordances"
+    url: "https://dl.acm.org/doi/10.1145/1409040.1409044"
+    type: "paper"
+    accessed_at: "${new Date().toISOString().slice(0, 10)}"
+cross_references:
+  - "[[Affordance]]"
+  - "[[CognitiveLoad]]"
+---
+
+# 1. Definição Canônica
+*Signifier* (Significante) consiste em qualquer marcador visual, sonoro ou tátil perceptível que comunica de maneira explícita o propósito e a mecânica de interação de um componente.
+
+# 2. Fundamentação Teórica e Cognitiva
+Formalizado por Don Norman (2008), o conceito emergiu da necessidade de distinguir o potencial físico relacional (Affordance de Gibson) dos sinais comunicativos deliberadamente desenhados por projetistas de interface.
+
+# 3. Gramática de Aplicação Prática (Heurísticas e Anti-padrões)
+- **Heurística:** Utilizar rótulos, ícones padronizados e microinterações de hover para sinalizar estados acionáveis.
+- **Anti-padrão:** Botões planos (*flat*) indistinguíveis de blocos de texto estático (*mystery meat navigation*).
+
+# 4. Métricas e Impacto em Produto
+- Redução na Taxa de Misclick (Cliques Perdidos).
+- Diminuição do Time to First Action em novos fluxos.
+
+# 5. Referências Cruzadas ([[WikiLinks]]) e Fontes
+- [[Affordance]]
+- [[CognitiveLoad]]
+`;
+    }
+
+    // 4. Default: template limpo de Affordance
+    return `---
+title: "Affordance"
+slug: "affordance"
+id: "affordance-02-01"
+canonical_id: "grimoar:ux:affordance"
+original_term: "Affordance"
+domain: "02-ux-interaction-design"
+subdomain: "02-affordances-e-signifiers"
+status: "canonical"
+version: "1.0.0"
+created_at: "${new Date().toISOString()}"
+updated_at: "${new Date().toISOString()}"
+summary: "Propriedade relacional entre as características físicas ou digitais de um artefato e as capacidades de ação do ator."
+tags:
+  - "usabilidade"
+  - "interacao"
+  - "psicologia-cognitiva"
+aliases:
+  - "Potencial de Ação"
+  - "Action Possibility"
+academic_anchors:
+  - "James J. Gibson (1979) - The Ecological Approach to Visual Perception"
+  - "Don Norman (1988) - The Design of Everyday Things"
+distinction_criteria:
+  - "Affordance NÃO é uma pista visual (signifier); existe ontologicamente mesmo que não seja visível ou percebida."
+typed_relations:
+  - target_concept: "signifier"
+    relation_type: "distinguished_from"
+    rationale: "Affordance é o potencial de ação; Signifier é a pista perceptível que comunica a existência da affordance."
+audit:
+  status: "APPROVED"
+  auditor: "academic-auditor-v1"
+  audited_at: "${new Date().toISOString()}"
+  academic_anchor_added:
+    - "James J. Gibson (1979) - The Ecological Approach to Visual Perception"
+sources:
+  - title: "The Design of Everyday Things"
+    url: "https://mitpress.mit.edu/books/design-everyday-things"
+    type: "book"
+    accessed_at: "${new Date().toISOString().slice(0, 10)}"
+cross_references:
+  - "[[Signifier]]"
+  - "[[CognitiveLoad]]"
+---
+
+# 1. Definição Canônica
+*Affordance* (potencial de ação) descreve a relação física ou digital entre as propriedades de um artefato e as capacidades do ator. Não é uma propriedade exclusiva do objeto nem do sujeito, mas sim da relação dinâmica entre ambos.
+
+# 2. Fundamentação Teórica e Cognitiva
+Cunhado por James J. Gibson (1979) na psicologia ecológica para definir possibilidades de ação ambientais, e adaptado por Don Norman (1988) para a Interação Humano-Computador sob o conceito de affordances percebidas.
+
+# 3. Gramática de Aplicação Prática (Heurísticas e Anti-padrões)
+- **Heurística:** Fornecer pistas visuais inequívocas sobre as ações permitidas por componentes interativos.
+- **Anti-padrão:** Falsa Affordance (*False Affordance*) — elementos com aparência clicável que não executam ações.
+
+# 4. Métricas e Impacto em Produto
+- Redução na Taxa de Cliques Perdidos (Dead Clicks).
+- Otimização do Time to First Action em fluxos primários.
+
+# 5. Referências Cruzadas ([[WikiLinks]]) e Fontes
+- [[Signifier]]
+- [[CognitiveLoad]]
 `;
   }
 }
