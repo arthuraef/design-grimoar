@@ -36,6 +36,13 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
     </a>
   </div>
 
+  <!-- Botão de Busca Rápida Estilo Notion (Quick Find / Command Palette) -->
+  <button type="button" class="notion-sidebar-search-btn" id="sidebar-search-trigger" aria-label="Abrir busca no Grimoar">
+    <span>🔍</span>
+    <span class="notion-sidebar-search-text">Buscar...</span>
+    <kbd class="notion-kbd">⌘K</kbd>
+  </button>
+
   <nav class="notion-sidebar-nav">
     <a href={`${cleanBase}/`} class={`notion-nav-item ${currentSlug === '' ? 'active' : ''}`}>
       <span class="notion-nav-icon">◽️</span>

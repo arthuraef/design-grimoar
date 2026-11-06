@@ -1,0 +1,330 @@
+---
+// Search.astro — Notion-like Command Palette Search powered by Pagefind
+interface Props {
+  base?: string;
+}
+
+const { base = '' } = Astro.props;
+const cleanBase = base ? base.replace(/\/$/, '') : '';
+---
+
+<!-- Modal de Busca Flutuante (Notion Command Palette) -->
+<div id="notion-search-backdrop" class="notion-search-backdrop" aria-hidden="true">
+  <div class="notion-search-dialog" role="dialog" aria-modal="true" aria-label="Buscar no Grimoar">
+    
+    <!-- Barra de Input Superior -->
+    <div class="notion-search-input-wrapper">
+      <span class="notion-search-input-icon">🔍</span>
+      <input
+        type="search"
+        id="notion-search-input"
+        class="notion-search-input"
+        placeholder="Buscar por verbetes, heurísticas, âncoras, tags... (Cmd + K)"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <kbd class="notion-kbd" id="notion-search-close-kbd">Esc</kbd>
+    </div>
+
+    <!-- Barra de Filtros Facetados (Categoria & Tags) -->
+    <div class="notion-search-facets" id="notion-search-facets">
+      <span class="notion-facet-label">Filtros:</span>
+      <button type="button" class="notion-facet-pill active" data-filter-type="all">Todos</button>
+      <!-- Pílulas de categorias e tags inseridas dinamicamente via Pagefind -->
+    </div>
+
+    <!-- Lista de Resultados Dinâmicos -->
+    <div class="notion-search-results" id="notion-search-results">
+      <div class="notion-search-empty">
+        Digite um termo ou escolha uma categoria para buscar no cânone...
+      </div>
+    </div>
+
+    <!-- Rodapé do Modal com Dicas de Teclado -->
+    <footer class="notion-search-footer">
+      <div class="notion-search-shortcuts">
+        <span><kbd class="notion-kbd">↑</kbd> <kbd class="notion-kbd">↓</kbd> Navegar</span>
+        <span><kbd class="notion-kbd">↵</kbd> Abrir</span>
+        <span><kbd class="notion-kbd">Esc</kbd> Fechar</span>
+      </div>
+      <div style="font-size: 11px; opacity: 0.7;">
+        ⚡ Indexação Pagefind
+      </div>
+    </footer>
+  </div>
+</div>
+
+<script is:inline define:vars={{ cleanBase }}>
+  (function () {
+    let pagefind = null;
+    let activeCategory = null;
+    let activeTag = null;
+    let selectedIndex = -1;
+    let currentResults = [];
+
+    const backdrop = document.getElementById('notion-search-backdrop');
+    const input = document.getElementById('notion-search-input');
+    const resultsContainer = document.getElementById('notion-search-results');
+    const facetsContainer = document.getElementById('notion-search-facets');
+
+    // Inicialização assíncrona do Pagefind
+    async function loadPagefind() {
+      if (pagefind) return pagefind;
+      try {
+        const pagefindUrl = `${cleanBase}/pagefind/pagefind.js`;
+        pagefind = await import(/* @vite-ignore */ pagefindUrl);
+        await pagefind.init();
+        await loadFacetedFilters();
+        return pagefind;
+      } catch (err) {
+        console.warn('[Pagefind]: Motor de busca indisponível em modo de desenvolvimento sem build prévio.', err);
+        return null;
+      }
+    }
+
+    // Carrega e monta os filtros laterais / superiores a partir das facetas do Pagefind
+    async function loadFacetedFilters() {
+      if (!pagefind) return;
+      try {
+        const filters = await pagefind.filters();
+        if (!filters || !facetsContainer) return;
+
+        // Limpa exceto o botão "Todos" e a label
+        const allBtn = facetsContainer.querySelector('[data-filter-type="all"]');
+        facetsContainer.innerHTML = '<span class="notion-facet-label">Filtros:</span>';
+        if (allBtn) facetsContainer.appendChild(allBtn);
+
+        // Facetas de Categoria (Domínio)
+        if (filters.Categoria) {
+          Object.keys(filters.Categoria).forEach((cat) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'notion-facet-pill';
+            btn.textContent = cat;
+            btn.dataset.filterType = 'Categoria';
+            btn.dataset.filterValue = cat;
+            btn.addEventListener('click', () => toggleFacet('Categoria', cat, btn));
+            facetsContainer.appendChild(btn);
+          });
+        }
+
+        // Facetas de Tags mais frequentes
+        if (filters.Tags) {
+          Object.keys(filters.Tags).slice(0, 5).forEach((tag) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'notion-facet-pill';
+            btn.textContent = `#${tag.replace(/^#/, '')}`;
+            btn.dataset.filterType = 'Tags';
+            btn.dataset.filterValue = tag;
+            btn.addEventListener('click', () => toggleFacet('Tags', tag, btn));
+            facetsContainer.appendChild(btn);
+          });
+        }
+      } catch (e) {
+        console.error('Erro ao ler filtros do Pagefind:', e);
+      }
+    }
+
+    function toggleFacet(type, value, btn) {
+      if (type === 'Categoria') {
+        if (activeCategory === value) {
+          activeCategory = null;
+          btn.classList.remove('active');
+        } else {
+          activeCategory = value;
+          facetsContainer.querySelectorAll('[data-filter-type="Categoria"]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        }
+      } else if (type === 'Tags') {
+        if (activeTag === value) {
+          activeTag = null;
+          btn.classList.remove('active');
+        } else {
+          activeTag = value;
+          facetsContainer.querySelectorAll('[data-filter-type="Tags"]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        }
+      }
+
+      const allBtn = facetsContainer.querySelector('[data-filter-type="all"]');
+      if (allBtn) {
+        if (!activeCategory && !activeTag) {
+          allBtn.classList.add('active');
+        } else {
+          allBtn.classList.remove('active');
+        }
+      }
+
+      executeSearch(input.value.trim());
+    }
+
+    // Reset de todos os filtros
+    facetsContainer?.querySelector('[data-filter-type="all"]')?.addEventListener('click', () => {
+      activeCategory = null;
+      activeTag = null;
+      facetsContainer.querySelectorAll('.notion-facet-pill').forEach(b => b.classList.remove('active'));
+      facetsContainer.querySelector('[data-filter-type="all"]')?.classList.add('active');
+      executeSearch(input.value.trim());
+    });
+
+    // Abertura e Fechamento do Modal
+    async function openSearch() {
+      if (!backdrop) return;
+      backdrop.classList.add('open');
+      backdrop.setAttribute('aria-hidden', 'false');
+      input?.focus();
+      await loadPagefind();
+      if (!input.value.trim()) {
+        executeSearch('');
+      }
+    }
+
+    function closeSearch() {
+      if (!backdrop) return;
+      backdrop.classList.remove('open');
+      backdrop.setAttribute('aria-hidden', 'true');
+      selectedIndex = -1;
+    }
+
+    // Executa busca combinando termo + filtros facetados
+    let debounceTimer;
+    async function executeSearch(query) {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(async () => {
+        if (!pagefind) await loadPagefind();
+        if (!pagefind) {
+          resultsContainer.innerHTML = '<div class="notion-search-empty">Índice do Pagefind gerado após o build. Execute <code>npm run build:docs</code>.</div>';
+          return;
+        }
+
+        resultsContainer.innerHTML = '<div class="notion-search-loading">Pesquisando no cânone...</div>';
+
+        const filterOptions = {};
+        if (activeCategory) filterOptions.Categoria = activeCategory;
+        if (activeTag) filterOptions.Tags = activeTag;
+
+        try {
+          const search = await pagefind.search(query || null, {
+            filters: filterOptions,
+          });
+
+          const results = await Promise.all(search.results.slice(0, 10).map(r => r.data()));
+          currentResults = results;
+          selectedIndex = -1;
+          renderResults(results, query);
+        } catch (e) {
+          resultsContainer.innerHTML = '<div class="notion-search-empty">Erro ao consultar o índice do Pagefind.</div>';
+        }
+      }, 120);
+    }
+
+    function renderResults(results, query) {
+      if (!resultsContainer) return;
+      if (results.length === 0) {
+        resultsContainer.innerHTML = `
+          <div class="notion-search-empty">
+            Nenhum verbete encontrado para "${query || 'os filtros selecionados'}".
+          </div>
+        `;
+        return;
+      }
+
+      resultsContainer.innerHTML = '';
+      results.forEach((item, index) => {
+        const a = document.createElement('a');
+        a.href = item.url;
+        a.className = 'notion-search-item';
+        a.dataset.index = index;
+
+        const title = item.meta?.title || 'Verbete';
+        const category = item.filters?.Categoria?.[0] || 'Cânone';
+        const excerpt = item.excerpt || '';
+
+        a.innerHTML = `
+          <div class="notion-search-item-header">
+            <span class="notion-search-item-icon">📄</span>
+            <span class="notion-search-item-title">${title}</span>
+            <span class="notion-search-item-badge">${category}</span>
+          </div>
+          ${excerpt ? `<div class="notion-search-item-excerpt">${excerpt}</div>` : ''}
+        `;
+
+        a.addEventListener('click', () => closeSearch());
+        resultsContainer.appendChild(a);
+      });
+    }
+
+    // Navegação por Teclado no Command Palette
+    function handleKeyDown(e) {
+      const items = resultsContainer?.querySelectorAll('.notion-search-item') || [];
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (items.length === 0) return;
+        selectedIndex = (selectedIndex + 1) % items.length;
+        updateSelection(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (items.length === 0) return;
+        selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+        updateSelection(items);
+      } else if (e.key === 'Enter') {
+        if (selectedIndex >= 0 && items[selectedIndex]) {
+          e.preventDefault();
+          items[selectedIndex].click();
+        }
+      }
+    }
+
+    function updateSelection(items) {
+      items.forEach((item, idx) => {
+        if (idx === selectedIndex) {
+          item.classList.add('selected');
+          item.scrollIntoView({ block: 'nearest' });
+        } else {
+          item.classList.remove('selected');
+        }
+      });
+    }
+
+    // Input listeners
+    input?.addEventListener('input', (e) => {
+      executeSearch(e.target.value.trim());
+    });
+    input?.addEventListener('keydown', handleKeyDown);
+
+    // Eventos globais de teclado (Cmd+K / Ctrl+K / Esc)
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        if (backdrop.classList.contains('open')) {
+          closeSearch();
+        } else {
+          openSearch();
+        }
+      } else if (e.key === 'Escape' && backdrop?.classList.contains('open')) {
+        closeSearch();
+      }
+    });
+
+    // Fechar ao clicar no backdrop externo
+    backdrop?.addEventListener('click', (e) => {
+      if (e.target === backdrop) {
+        closeSearch();
+      }
+    });
+
+    // Triggers externos
+    document.addEventListener('click', (e) => {
+      const target = e.target.closest('#sidebar-search-trigger, #header-search-trigger, [data-open-search]');
+      if (target) {
+        e.preventDefault();
+        openSearch();
+      }
+    });
+
+    // Expor método global de abertura
+    window.openGrimoarSearch = openSearch;
+  })();
+</script>

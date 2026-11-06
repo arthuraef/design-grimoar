@@ -5,7 +5,6 @@ const docs = defineCollection({
   loader: glob({
     pattern: ['**/*.md', '!**/template-*.md', '!**/README.md'],
     base: './src/content/docs',
-    generateId: ({ entry }) => entry.replace(/\.md$/, ''),
   }),
   schema: z.object({
     title: z.string(),

@@ -35,73 +35,87 @@ const breadcrumbs = [
 ---
 
 <NotionLayout title={`${title} — Design Grimoar`} description={summary} breadcrumbs={breadcrumbs} currentSlug={frontmatter.slug}>
-  <!-- Notion Page Icon -->
-  <div class="notion-page-icon">📄</div>
+  <!-- Envoltório Canônico indexável pelo Pagefind -->
+  <article data-pagefind-body>
+    <!-- Notion Page Icon -->
+    <div class="notion-page-icon" data-pagefind-ignore>📄</div>
 
-  <!-- Notion Page Title -->
-  <h1 class="notion-page-title">{title}</h1>
+    <!-- Notion Page Title -->
+    <h1 class="notion-page-title" data-pagefind-meta="title">{title}</h1>
 
-  <!-- Notion Properties Table -->
-  <div class="notion-properties">
-    <div class="notion-property-row">
-      <div class="notion-property-key"><span>🏷️</span> <span>Status</span></div>
-      <div class="notion-property-value">
-        <span class="notion-tag">{status}</span>
-        {audit?.status && (
-          <span class="notion-tag" style="margin-left: 6px; background-color: var(--bg-hover);">
-            Auditoria: {audit.status}
-          </span>
-        )}
-      </div>
-    </div>
-
-    {domain && (
+    <!-- Notion Properties Table & Filtros Facetados Pagefind -->
+    <div class="notion-properties">
       <div class="notion-property-row">
-        <div class="notion-property-key"><span>📂</span> <span>Domínio</span></div>
-        <div class="notion-property-value">{domain} {subdomain ? `› ${subdomain}` : ''}</div>
-      </div>
-    )}
-
-    <div class="notion-property-row">
-      <div class="notion-property-key"><span>🔢</span> <span>Versão</span></div>
-      <div class="notion-property-value">{version}</div>
-    </div>
-
-    {anchors.length > 0 && (
-      <div class="notion-property-row">
-        <div class="notion-property-key"><span>🎓</span> <span>Âncoras</span></div>
+        <div class="notion-property-key"><span>🏷️</span> <span>Status</span></div>
         <div class="notion-property-value">
-          {anchors.join(' • ')}
+          <span class="notion-tag" data-pagefind-filter="Status">{status}</span>
+          {audit?.status && (
+            <span class="notion-tag" style="margin-left: 6px; background-color: var(--bg-hover);">
+              Auditoria: {audit.status}
+            </span>
+          )}
         </div>
       </div>
-    )}
 
-    {tags.length > 0 && (
-      <div class="notion-property-row">
-        <div class="notion-property-key"><span>🔖</span> <span>Tags</span></div>
-        <div class="notion-property-value">
-          <div class="notion-tags">
-            {tags.map((tag: string) => (
-              <span class="notion-tag">#{tag}</span>
-            ))}
+      {domain && (
+        <div class="notion-property-row">
+          <div class="notion-property-key"><span>📂</span> <span>Domínio</span></div>
+          <div class="notion-property-value">
+            <span class="notion-tag" data-pagefind-filter="Categoria" style="font-weight: 500;">
+              {domain}
+            </span>
+            {subdomain && (
+              <span style="margin-left: 6px; font-size: 13px; color: var(--text-muted);">
+                › <span data-pagefind-filter="Subcategoria">{subdomain}</span>
+              </span>
+            )}
           </div>
         </div>
+      )}
+
+      <div class="notion-property-row">
+        <div class="notion-property-key"><span>🔢</span> <span>Versão</span></div>
+        <div class="notion-property-value">{version}</div>
+      </div>
+
+      {anchors.length > 0 && (
+        <div class="notion-property-row">
+          <div class="notion-property-key"><span>🎓</span> <span>Âncoras</span></div>
+          <div class="notion-property-value" data-pagefind-meta="anchors">
+            {anchors.join(' • ')}
+          </div>
+        </div>
+      )}
+
+      {tags.length > 0 && (
+        <div class="notion-property-row">
+          <div class="notion-property-key"><span>🔖</span> <span>Tags</span></div>
+          <div class="notion-property-value">
+            <div class="notion-tags">
+              {tags.map((tag: string) => (
+                <span class="notion-tag" data-pagefind-filter="Tags">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+
+    <!-- Resumo Canônico Callout -->
+    {summary && (
+      <div class="notion-callout" data-pagefind-meta="summary">
+        <div class="notion-callout-icon" data-pagefind-ignore>💡</div>
+        <div class="notion-callout-body">
+          <strong>Síntese Conceitual:</strong> {summary}
+        </div>
       </div>
     )}
-  </div>
 
-  <!-- Resumo Canônico Callout -->
-  {summary && (
-    <div class="notion-callout">
-      <div class="notion-callout-icon">💡</div>
-      <div class="notion-callout-body">
-        <strong>Síntese Conceitual:</strong> {summary}
-      </div>
+    <!-- Corpo do Verbete (As 5 Seções Obrigatórias) -->
+    <div class="notion-content">
+      <Content />
     </div>
-  )}
-
-  <!-- Corpo do Verbete (As 5 Seções Obrigatórias) -->
-  <article class="notion-content">
-    <Content />
   </article>
 </NotionLayout>

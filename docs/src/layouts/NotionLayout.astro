@@ -1,6 +1,7 @@
 ---
 import Sidebar from '../components/Sidebar.astro';
 import ThemeToggle from '../components/ThemeToggle.astro';
+import Search from '../components/Search.astro';
 import '../styles/notion.css';
 
 interface Props {
@@ -66,6 +67,11 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
           </nav>
 
           <div class="notion-header-actions">
+            <button type="button" class="notion-header-search-btn" id="header-search-trigger" aria-label="Abrir busca no Grimoar">
+              <span>🔍</span>
+              <span>Buscar</span>
+              <kbd class="notion-kbd">⌘K</kbd>
+            </button>
             <ThemeToggle />
           </div>
         </header>
@@ -76,5 +82,8 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
         </main>
       </div>
     </div>
+
+    <!-- Componente Command Palette Search do Pagefind -->
+    <Search base={cleanBase} />
   </body>
 </html>
