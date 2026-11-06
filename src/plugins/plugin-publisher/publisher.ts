@@ -157,7 +157,11 @@ export class PublisherService {
         const { stdout: remotes } = await execFileAsync('git', ['remote']);
         if (remotes.trim()) {
           console.log(`[Publisher - Git]: Enviando push para origin/${this.githubBranch}...`);
-          await execFileAsync('git', ['push', 'origin', this.githubBranch]);
+          const repo = this.config.githubRepo || process.env.GITHUB_REPO || 'arthuraef/design-grimoar';
+          const pushTarget = this.githubToken
+            ? `https://x-access-token:${this.githubToken}@github.com/${repo.replace(/^\//, '')}.git`
+            : 'origin';
+          await execFileAsync('git', ['push', pushTarget, this.githubBranch]);
           pushed = true;
           console.log('[Publisher - Git]: Push remoto concluído.');
         } else {
