@@ -8,7 +8,9 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "validate:schema": "tsx src/schema.ts",
-    "test": "tsx src/test-schema.ts && tsx src/test-ingestor.ts && tsx src/test-verification-loop.ts",
+    "build:docs": "npm --prefix docs run build",
+    "dev:docs": "npm --prefix docs run dev",
+    "test": "NODE_ENV=test tsx src/test-schema.ts && NODE_ENV=test tsx src/test-ingestor.ts && NODE_ENV=test tsx src/test-verification-loop.ts && NODE_ENV=test tsx src/test-publisher-notifier.ts",
     "lint": "tsc --noEmit"
   },
   "keywords": [

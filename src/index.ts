@@ -3,15 +3,16 @@ import dotenv from 'dotenv';
 import ingestorPlugin, { IngestorPlugin } from './plugins/plugin-ingestor/index.js';
 import synthesizerPlugin, { SynthesizerPlugin } from './plugins/plugin-synthesizer/index.js';
 import academicValidatorPlugin, { AcademicValidatorPlugin } from './plugins/plugin-academic-validator/index.js';
+import publisherPlugin, { PublisherPlugin } from './plugins/plugin-publisher/index.js';
+import hermesNotifierPlugin, { HermesNotifierPlugin } from './plugins/plugin-hermes-notifier/index.js';
 import { VerificationLoopController } from './plugins/verification-loop.js';
-import { validateAndIndexVerbete } from './stages/stage4-validator.js';
-import { saveCanonicalVerbete } from './stages/stage5-git.js';
 import { PipelineExecutionResult } from './types/index.js';
 
 dotenv.config();
 
 /**
  * Orquestrador DeepSeek Harness (Cordis Framework) — Design Grimoar
+ * Configurado com clientes HTTP reais para todas as etapas produtivas.
  */
 export const ctx = new Context();
 
@@ -19,42 +20,84 @@ export class GrimoarOrchestrator {
   private ingestor: IngestorPlugin;
   private synthesizer: SynthesizerPlugin;
   private validator: AcademicValidatorPlugin;
+  private publisher: PublisherPlugin;
+  private notifier: HermesNotifierPlugin;
   private loopController: VerificationLoopController;
 
   constructor(protected ctx: Context) {
+    // 1. Ingestor: Firecrawl MCP / REST + VibeVoice ASR + pgvector embeddings reais
     this.ingestor = new IngestorPlugin(ctx, {
-      similarityThreshold: 0.82,
+      similarityThreshold: parseFloat(process.env.SIMILARITY_THRESHOLD || '0.82'),
       databaseUrl: process.env.DATABASE_URL,
       firecrawlApiKey: process.env.FIRECRAWL_API_KEY,
-      firecrawlApiUrl: process.env.FIRECRAWL_API_URL,
+      firecrawlApiUrl: process.env.FIRECRAWL_API_URL || 'https://api.firecrawl.dev',
     });
 
+    // 2. Synthesizer (Lexicógrafo - Generator): Leitura dinâmica do .env
     this.synthesizer = new SynthesizerPlugin(ctx, {
-      promptPath: 'prompts/step2-lexicographer.md',
-      apiKey: process.env.DEEPSEEK_API_KEY,
-      baseUrl: 'https://api.deepseek.com',
-      model: 'deepseek-chat',
+      promptPath: process.env.LEXICOGRAPHER_PROMPT_PATH || 'prompts/step2-lexicographer.md',
+      apiKey: process.env.LEXICOGRAPHER_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY,
+      baseUrl:
+        process.env.LEXICOGRAPHER_BASE_URL ||
+        process.env.DEEPSEEK_BASE_URL ||
+        (process.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com' : 'https://api.openai.com/v1'),
+      model:
+        process.env.LEXICOGRAPHER_MODEL ||
+        process.env.DEEPSEEK_MODEL ||
+        (process.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : 'gpt-4o'),
+      temperature: parseFloat(process.env.LEXICOGRAPHER_TEMPERATURE || '0.2'),
     });
 
+    // 3. Academic Validator (Auditor - Verifier): Chamada isolada e independente
     this.validator = new AcademicValidatorPlugin(ctx, {
-      promptPath: 'prompts/step3-academic-auditor.md',
-      apiKey: process.env.OPENAI_API_KEY || process.env.DEEPSEEK_API_KEY,
-      baseUrl: process.env.OPENAI_API_KEY ? 'https://api.openai.com/v1' : 'https://api.deepseek.com',
-      model: process.env.OPENAI_API_KEY ? 'gpt-4o' : 'deepseek-reasoner',
+      promptPath: process.env.ACADEMIC_AUDITOR_PROMPT_PATH || 'prompts/step3-academic-auditor.md',
+      apiKey:
+        process.env.ACADEMIC_AUDITOR_API_KEY ||
+        process.env.OPENAI_API_KEY ||
+        process.env.DEEPSEEK_API_KEY,
+      baseUrl:
+        process.env.ACADEMIC_AUDITOR_BASE_URL ||
+        process.env.OPENAI_BASE_URL ||
+        (process.env.OPENAI_API_KEY ? 'https://api.openai.com/v1' : 'https://api.deepseek.com'),
+      model:
+        process.env.ACADEMIC_AUDITOR_MODEL ||
+        process.env.OPENAI_MODEL ||
+        (process.env.OPENAI_API_KEY ? 'gpt-4o' : 'deepseek-reasoner'),
+      temperature: parseFloat(process.env.ACADEMIC_AUDITOR_TEMPERATURE || '0.1'),
     });
 
-    // Controlador do Loop de Verificação (Lexicógrafo -> Auditor -> Zod) com limite de 3 tentativas
+    // 4. Publisher (Git, pgvector e Front-end Estático): Operações atômicas no repositório
+    this.publisher = new PublisherPlugin(ctx, {
+      databaseUrl: process.env.DATABASE_URL,
+      staticSiteContentDir: process.env.STATIC_SITE_CONTENT_DIR || 'docs/src/content/docs',
+      githubBranch: process.env.GITHUB_BRANCH || 'main',
+      githubToken: process.env.GITHUB_TOKEN,
+    });
+
+    // 5. Hermes Notifier: API / Webhook do Hermes Agent para push no dispositivo
+    this.notifier = new HermesNotifierPlugin(ctx, {
+      hermesApiUrl: process.env.HERMES_AGENT_API_URL || 'http://localhost:5055/webhook/step-completed',
+      webhookUrl: process.env.NOTIFICATIONS_WEBHOOK_URL,
+    });
+
+    // Controlador do Loop de Verificação (Lexicógrafo -> Auditor -> Zod) com limite estrito
+    const maxAttempts = parseInt(process.env.VERIFICATION_LOOP_MAX_ATTEMPTS || '3', 10);
     this.loopController = new VerificationLoopController({
-      maxAttempts: 3,
+      maxAttempts,
       synthesizer: this.synthesizer.service,
       validator: this.validator.service,
     });
   }
 
   /**
-   * Execução do Pipeline Canônico com Roteamento Semântico e Loop de Verificação
+   * Execução do Pipeline Canônico Completo de 5 Etapas:
+   * 1. Ingestão Web/Áudio Determinística + Sanitização Prompt Injection
+   * 2. Roteamento Semântico (pgvector >= 0.82 MERGE vs CREATE)
+   * 3. Loop de Verificação (Lexicógrafo -> Auditor Acadêmico -> Zod Hard Gate com retries)
+   * 4. Publicação Atômica (Git commit/push + pgvector update + AppFlowy sync)
+   * 5. Confirmação do Hash e Notificação Hermes Agent para dispositivo
    */
-  async processContentToVerbete(urlOrSource: string, isAudio: boolean = false): Promise<PipelineExecutionResult> {
+  async processContentToVerbete(urlOrSource: string, isAudio: boolean = false): Promise<PipelineExecutionResult & { commitHash?: string }> {
     console.log(`\n======================================================`);
     console.log(`🚀 Iniciando Pipeline Design Grimoar para: ${urlOrSource}`);
     console.log(`======================================================\n`);
@@ -105,37 +148,47 @@ export class GrimoarOrchestrator {
       };
     }
 
-    // Persistência no Banco Vetorial (pgvector)
-    console.log(`\n[Persistência Vetorial]: Indexando verbete canônico no pgvector...`);
-    await validateAndIndexVerbete(loopResult.finalMarkdown);
+    // ETAPA 5: Publicação Atômica (Git Commit/Push + Atualização Vetorial no pgvector + AppFlowy Sync)
+    console.log(`\n[Etapa 5]: Executando publicação atômica via plugin-publisher...`);
+    const publishResult = await this.publisher.publish(loopResult.frontmatter, loopResult.finalMarkdown);
 
-    // ETAPA 5: Armazenamento Canônico (SSOT) na Taxonomia
-    console.log(`\n[Etapa 5]: Persistência do verbete canônico na taxonomia...`);
-    const { filePath } = await saveCanonicalVerbete(loopResult.frontmatter, loopResult.finalMarkdown);
+    if (!publishResult.commitHash) {
+      return {
+        success: false,
+        stage: 5,
+        errors: ['Falha crítica: hash de commit não confirmado no Git.'],
+      };
+    }
+
+    // ETAPA FINAL: Confirmação do Hash e Notificação via Hermes Agent para o dispositivo
+    console.log(`\n[Notificação Hermes Agent]: Confirmando hash ${publishResult.commitHash} e notificando dispositivo...`);
+    await this.notifier.notify({
+      publishResult,
+      frontmatter: loopResult.frontmatter,
+      attemptsUsed: loopResult.attemptsUsed,
+      academicAnchors: loopResult.auditResult.academic_anchor_added,
+    });
 
     return {
       success: true,
       stage: 5,
-      verbetePath: filePath,
+      verbetePath: publishResult.filePath,
       frontmatter: loopResult.frontmatter,
+      commitHash: publishResult.commitHash,
     };
   }
 }
 
-// Registro dos plugins no Cordis
-ctx.plugin(ingestorPlugin, {
-  similarityThreshold: 0.82,
-});
-ctx.plugin(synthesizerPlugin, {
-  promptPath: 'prompts/step2-lexicographer.md',
-});
-ctx.plugin(academicValidatorPlugin, {
-  promptPath: 'prompts/step3-academic-auditor.md',
-});
+// Registro de todos os plugins no Cordis
+ctx.plugin(ingestorPlugin);
+ctx.plugin(synthesizerPlugin);
+ctx.plugin(academicValidatorPlugin);
+ctx.plugin(publisherPlugin);
+ctx.plugin(hermesNotifierPlugin);
 
 ctx.plugin((ctx) => {
   const orchestrator = new GrimoarOrchestrator(ctx);
-  console.log('⚡ [DeepSeek Harness / Cordis]: Orquestrador Design Grimoar pronto para execução.');
+  console.log('⚡ [DeepSeek Harness / Cordis]: Orquestrador Design Grimoar 100% operacional.');
 
   // CLI rápida para testes se fornecido argumento via linha de comando
   const target = process.argv[2];
@@ -145,7 +198,7 @@ ctx.plugin((ctx) => {
       .processContentToVerbete(target, isAudioFlag || target === 'uxpodcast')
       .then((res) => {
         if (res.success) {
-          console.log(`\n🎉 Pipeline concluído com sucesso! Arquivo gerado em: ${res.verbetePath}`);
+          console.log(`\n🎉 Pipeline concluído com sucesso! Commit: ${res.commitHash} | Arquivo: ${res.verbetePath}`);
         } else {
           console.error(`\n❌ Falha no pipeline na etapa ${res.stage}:`, res.errors);
           process.exit(1);

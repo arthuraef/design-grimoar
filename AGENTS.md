@@ -5,7 +5,7 @@
 - **Orquestrador de Agentes:** DeepSeek Harness (`@deepseek-ai/dsh` / Cordis Framework).
 - **Ingestão Web & Áudio:** Firecrawl (Self-hosted/MCP) + Microsoft VibeVoice ASR (0.5B).
 - **Banco Vetorial:** PostgreSQL (`pgvector`) ou Oracle Autonomous DB 23ai.
-- ** Armazenamento Canônico (SSOT) & Wiki:** GitHub (`Design Grimoar`) + AppFlowy Self-Hosted.
+- **Armazenamento Canônico (SSOT) & Front-end Oficial:** GitHub (`Design Grimoar`) + GitHub Pages (Site Estático Notion-like via Astro em `/docs`).
 - **Notificações & Cron:** Hermes Agent (Nous Research).
 
 ## Regras Inegociáveis de Engenharia
@@ -13,3 +13,4 @@
 2. **Isolamento de Agentes (Generator-Verifier):** A Etapa 2 (Síntese) e a Etapa 3 (Validação Acadêmica) devem usar prompts de sistema separados e chamadas de API independentes para evitar viés de confirmação.
 3. **Segurança (Least Privilege):** O processo que consome dados externos via Firecrawl não pode conter variáveis de ambiente do GitHub (`GITHUB_TOKEN`) nem permissão de escrita direta no repositório.
 4. **Validação de Schema (Hard Gate):** Todo verbete gerado deve passar por validação `Zod`/`Pydantic` antes do commit.
+5. **Diretriz Estrita de Nomenclatura e Tradução:** Todos os termos técnicos, frameworks e conceitos da indústria devem ser mantidos obrigatoriamente em seu idioma original (inglês). A tradução para o Português do Brasil deve aparecer apenas uma vez, logo na descrição ou definição inicial, exclusivamente para fins de ilustração e contexto.

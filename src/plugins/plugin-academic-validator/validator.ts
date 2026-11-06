@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { resolvePromptFile } from '../plugin-synthesizer/synthesizer.js';
+import { resolvePromptFile, sanitizeBaseUrl } from '../plugin-synthesizer/synthesizer.js';
 
 export interface AcademicAuditResult {
   status: 'APPROVED' | 'REJECTED';
@@ -15,13 +15,14 @@ export interface AcademicValidatorConfig {
   model?: string;
   baseUrl?: string;
   temperature?: number;
+  allowTestFallback?: boolean;
 }
 
 /**
  * Serviço do Auditor Científico e Acadêmico (Agente Verificador)
  * 
  * Regra Inegociável 2: Isolamento de Agentes (Generator-Verifier).
- * Chamada de API e prompt de sistema totalmente independentes do Lexicógrafo.
+ * Realiza chamadas HTTP reais com chaves e endpoints independentes do Lexicógrafo.
  */
 export class AcademicValidatorService {
   private systemPrompt: string;
@@ -29,56 +30,99 @@ export class AcademicValidatorService {
   private model: string;
   private baseUrl: string;
   private temperature: number;
+  private allowFallback: boolean;
 
   constructor(config: AcademicValidatorConfig = {}) {
     const promptPath = resolvePromptFile(config.promptPath || 'prompts/step3-academic-auditor.md');
     this.systemPrompt = fs.readFileSync(promptPath, 'utf-8');
 
-    // Isolamento: prioriza chave independente para o verificador
-    this.apiKey = config.apiKey || process.env.OPENAI_API_KEY || process.env.DEEPSEEK_API_KEY;
-    this.model = config.model || (process.env.OPENAI_API_KEY ? 'gpt-4o' : 'deepseek-reasoner');
-    this.baseUrl = config.baseUrl || (process.env.OPENAI_API_KEY ? 'https://api.openai.com/v1' : 'https://api.deepseek.com');
-    this.temperature = config.temperature ?? 0.1; // Baixa temperatura para auditoria rigorosa
+    // Leitura estrita de variáveis de ambiente do .env para o Verificador Independente
+    this.apiKey =
+      config.apiKey ||
+      process.env.ACADEMIC_AUDITOR_API_KEY ||
+      process.env.OPENAI_API_KEY ||
+      process.env.DEEPSEEK_API_KEY;
+
+    const rawBaseUrl =
+      config.baseUrl ||
+      process.env.ACADEMIC_AUDITOR_BASE_URL ||
+      process.env.OPENAI_BASE_URL ||
+      (process.env.OPENAI_API_KEY ? 'https://api.openai.com/v1' : 'https://api.deepseek.com');
+    this.baseUrl = sanitizeBaseUrl(rawBaseUrl);
+
+    this.model =
+      config.model ||
+      process.env.ACADEMIC_AUDITOR_MODEL ||
+      process.env.OPENAI_MODEL ||
+      (process.env.OPENAI_API_KEY ? 'gpt-4o' : 'deepseek-reasoner');
+
+    this.temperature =
+      config.temperature ?? parseFloat(process.env.ACADEMIC_AUDITOR_TEMPERATURE || '0.1');
+
+    const isTest = process.env.NODE_ENV === 'test';
+    this.allowFallback = config.allowTestFallback ?? (isTest || process.env.ALLOW_TEST_FALLBACKS === 'true');
   }
 
   /**
-   * Executa a auditoria acadêmica independente do rascunho de verbete
+   * Executa a auditoria acadêmica independente do rascunho de verbete via cliente HTTP real
    */
   async validate(draftMarkdown: string): Promise<AcademicAuditResult> {
-    console.log('[Auditor Acadêmico]: Iniciando avaliação científica rigorosa do rascunho...');
+    console.log(`[Auditor Acadêmico]: Iniciando avaliação científica via ${this.model}...`);
 
     const userMessage = `Por favor, audite rigorosamente o rascunho de verbete abaixo segundo seus critérios acadêmicos e retorne o JSON estrito:\n\n${draftMarkdown}`;
 
+    // 1. Cliente HTTP Real para LLM Verifier (OpenAI / DeepSeek / Endpoint independente)
     if (this.apiKey) {
-      const endpoint = this.baseUrl.endsWith('/') ? `${this.baseUrl}chat/completions` : `${this.baseUrl}/chat/completions`;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.model,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: this.systemPrompt },
-            { role: 'user', content: userMessage },
-          ],
-          temperature: this.temperature,
-        }),
-      });
+      const endpoint = this.baseUrl.endsWith('/')
+        ? `${this.baseUrl}chat/completions`
+        : `${this.baseUrl}/chat/completions`;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`[Auditor Acadêmico API Error ${response.status}]: ${errorText}`);
+      console.log(`[Auditor Acadêmico]: Enviando requisição real para ${endpoint} (${this.model})...`);
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: this.model,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: this.systemPrompt },
+              { role: 'user', content: userMessage },
+            ],
+            temperature: this.temperature,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`[Auditor Acadêmico API Error HTTP ${response.status}]: ${errorText}`);
+        }
+
+        const data: any = await response.json();
+        const rawJson = data.choices?.[0]?.message?.content || '{}';
+        return this.parseAuditResponse(rawJson, draftMarkdown);
+      } catch (err: any) {
+        if (!this.allowFallback) {
+          throw err;
+        }
+        console.warn(`[Auditor Acadêmico]: Erro na chamada real à API (${err.message}). Utilizando fallback determinístico de teste.`);
       }
-
-      const data: any = await response.json();
-      const rawJson = data.choices?.[0]?.message?.content || '{}';
-      return this.parseAuditResponse(rawJson, draftMarkdown);
     }
 
-    // Validador acadêmico determinístico para ambiente offline / testes
+    // 2. Se não houver chave em produção, lança erro explícito
+    if (!this.allowFallback) {
+      throw new Error(
+        '[Auditor Acadêmico]: Chave de API não configurada no .env. ' +
+        'Defina ACADEMIC_AUDITOR_API_KEY ou OPENAI_API_KEY.'
+      );
+    }
+
+    // 3. Validador acadêmico determinístico para ambiente offline / testes
+    console.warn('[Auditor Acadêmico]: Modo de teste ativo — utilizando auditor determinístico de teste.');
     return this.deterministicAudit(draftMarkdown);
   }
 

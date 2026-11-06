@@ -35,7 +35,7 @@ export class IngestorPlugin {
       apiUrl: config.firecrawlApiUrl,
     });
     this.transcriber = new VibeVoiceTranscriber();
-    this.router = new SemanticRouter(config.databaseUrl);
+    this.router = new SemanticRouter({ databaseUrl: config.databaseUrl });
 
     console.log('🔌 [Plugin Ingestor]: Inicializado no DeepSeek Harness.');
     console.log(`   - Limiar de Similaridade de Cosseno: ${this.threshold}`);

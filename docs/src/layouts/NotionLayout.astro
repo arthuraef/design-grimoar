@@ -1,0 +1,80 @@
+---
+import Sidebar from '../components/Sidebar.astro';
+import ThemeToggle from '../components/ThemeToggle.astro';
+import '../styles/notion.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  breadcrumbs?: Array<{ label: string; href?: string }>;
+  currentSlug?: string;
+}
+
+const {
+  title = 'Design Grimoar — Enciclopédia Canônica de Product Design',
+  description = 'Tratado canônico e cartografia epistemológica do Product Design, UX e Sistemas Digitais.',
+  breadcrumbs = [{ label: 'Design Grimoar', href: '/' }],
+  currentSlug = '',
+} = Astro.props;
+
+const base = import.meta.env.BASE_URL || '/';
+const cleanBase = base ? base.replace(/\/$/, '') : '';
+---
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📓</text></svg>" />
+    
+    <!-- Script Anti-FOUC para Dark/Light Mode Imediato -->
+    <script is:inline>
+      (function() {
+        try {
+          const stored = localStorage.getItem('grimoar-theme');
+          const preferred = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', preferred);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="notion-layout">
+      <!-- Barra Lateral Estilo Notion -->
+      <Sidebar currentSlug={currentSlug} base={cleanBase} />
+
+      <!-- Palco Central de Leitura -->
+      <div class="notion-stage">
+        <!-- Barra de Cabeçalho Superior -->
+        <header class="notion-header-bar">
+          <nav class="notion-breadcrumbs" aria-label="Navegação em trilha">
+            {breadcrumbs.map((crumb, idx) => (
+              <>
+                {idx > 0 && <span style="opacity: 0.4;">/</span>}
+                {crumb.href ? (
+                  <a href={`${cleanBase}${crumb.href === '/' ? '/' : crumb.href}`} class="notion-breadcrumb-link">
+                    {crumb.label}
+                  </a>
+                ) : (
+                  <span style="color: var(--text-main); font-weight: 500;">{crumb.label}</span>
+                )}
+              </>
+            ))}
+          </nav>
+
+          <div class="notion-header-actions">
+            <ThemeToggle />
+          </div>
+        </header>
+
+        <!-- Conteúdo do Verbete Centralizado -->
+        <main class="notion-page-container">
+          <slot />
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

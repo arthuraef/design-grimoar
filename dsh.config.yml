@@ -24,6 +24,15 @@ plugins:
       temperature: 0.1
       model: 'deepseek-reasoner' # Ou modelo independente verifier (ex: gpt-4o)
 
+  - name: './src/plugins/plugin-publisher'
+    config:
+      githubBranch: 'main'
+      staticSiteContentDir: './docs/src/content/docs'
+
+  - name: './src/plugins/plugin-hermes-notifier'
+    config:
+      hermesApiUrl: 'http://localhost:5055/webhook/step-completed'
+
   - name: '@deepseek-ai/dsh-tool-fs'
     config:
       baseDir: './taxonomia'
@@ -61,6 +70,15 @@ pipeline:
       mandatorySections: 5
 
   stage5:
-    name: 'Commit Canônico & Wiki SSOT'
+    name: 'Publicação Atômica & SSOT (plugin-publisher)'
     deterministic: true
     target: './taxonomia'
+    gitCommitAtomic: true
+    vectorDbUpdate: true
+    appFlowySync: true
+
+  stage6:
+    name: 'Notificação Estruturada Hermes (plugin-hermes-notifier)'
+    trigger: 'postCommitHashVerification'
+    agent: 'hermes-agent'
+    channel: 'device-push-webhook'

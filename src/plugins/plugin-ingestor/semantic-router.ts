@@ -26,68 +26,123 @@ export interface SemanticRoutingPayload {
 
 export const COSINE_SIMILARITY_THRESHOLD = 0.82;
 
+export interface SemanticRouterConfig {
+  databaseUrl?: string;
+  embeddingApiKey?: string;
+  embeddingBaseUrl?: string;
+  embeddingModel?: string;
+  embeddingDimensions?: number;
+  allowTestFallback?: boolean;
+}
+
 /**
  * Roteador Semântico de Ingestão via pgvector
  * Cumpre a Regra 1: Cálculo estrito e determinístico de similaridade vetorial (sem LLM).
  */
 export class SemanticRouter {
   private pool?: pg.Pool;
+  private embeddingApiKey?: string;
+  private embeddingBaseUrl: string;
+  private embeddingModel: string;
+  private embeddingDimensions: number;
+  private allowFallback: boolean;
 
-  constructor(databaseUrl?: string) {
-    const url = databaseUrl || process.env.DATABASE_URL;
+  constructor(config: SemanticRouterConfig = {}) {
+    const url = config.databaseUrl || process.env.DATABASE_URL;
     if (url) {
       this.pool = new Pool({ connectionString: url });
     }
+
+    this.embeddingApiKey = config.embeddingApiKey || process.env.EMBEDDING_API_KEY || process.env.OPENAI_API_KEY;
+    const rawBaseUrl =
+      config.embeddingBaseUrl ||
+      process.env.EMBEDDING_BASE_URL ||
+      process.env.OPENAI_BASE_URL ||
+      'https://api.openai.com/v1';
+    const match = rawBaseUrl.match(/https?:\/\/[^\s)\]]+/);
+    this.embeddingBaseUrl = (match ? match[0] : rawBaseUrl).replace(/\/+$/, '');
+    this.embeddingModel = config.embeddingModel || process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+    this.embeddingDimensions =
+      config.embeddingDimensions || parseInt(process.env.EMBEDDING_DIMENSIONS || '1536', 10);
+
+    const isTest = process.env.NODE_ENV === 'test';
+    this.allowFallback = config.allowTestFallback ?? (isTest || process.env.ALLOW_TEST_FALLBACKS === 'true');
   }
 
   /**
-   * Gera o vetor de embedding (1536 dimensões)
+   * Gera o vetor de embedding real de 1536 dimensões via HTTP API
    */
   async generateEmbedding(text: string): Promise<number[]> {
-    const apiKey = process.env.OPENAI_API_KEY;
-    const truncatedText = text.slice(0, 8000); // Limite de contexto
+    const truncatedText = text.slice(0, 8000);
 
-    if (apiKey) {
+    // 1. Cliente HTTP Real para Embeddings (OpenAI / Endpoint compatível)
+    if (this.embeddingApiKey) {
+      const endpoint = this.embeddingBaseUrl.endsWith('/')
+        ? `${this.embeddingBaseUrl}embeddings`
+        : `${this.embeddingBaseUrl}/embeddings`;
+
       try {
-        const response = await fetch('https://api.openai.com/v1/embeddings', {
+        const payload: Record<string, any> = {
+          model: this.embeddingModel,
+          input: truncatedText,
+        };
+
+        // Adiciona dimensions se o modelo for da família text-embedding-3
+        if (this.embeddingModel.includes('text-embedding-3')) {
+          payload.dimensions = this.embeddingDimensions;
+        }
+
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${this.embeddingApiKey}`,
           },
-          body: JSON.stringify({
-            model: 'text-embedding-3-small',
-            input: truncatedText,
-          }),
+          body: JSON.stringify(payload),
         });
 
-        if (response.ok) {
-          const data: any = await response.json();
-          return data.data[0].embedding;
+        if (!response.ok) {
+          const errBody = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errBody}`);
+        }
+
+        const data: any = await response.json();
+        const embedding = data.data?.[0]?.embedding;
+        if (Array.isArray(embedding) && embedding.length > 0) {
+          return embedding;
         }
       } catch (err: any) {
-        console.warn(`[SemanticRouter]: Erro ao gerar embedding via OpenAI (${err.message}). Utilizando gerador determinístico.`);
+        if (!this.allowFallback) {
+          throw new Error(
+            `[SemanticRouter]: Falha crítica ao gerar embeddings via API real (${this.embeddingBaseUrl}): ${err.message}`
+          );
+        }
+        console.warn(`[SemanticRouter]: Erro ao gerar embedding real (${err.message}). Utilizando fallback determinístico de teste.`);
       }
+    } else if (!this.allowFallback) {
+      throw new Error(
+        '[SemanticRouter]: Chave de API para geração de embeddings não configurada no .env. ' +
+        'Defina EMBEDDING_API_KEY ou OPENAI_API_KEY.'
+      );
     }
 
-    // Gerador determinístico de embedding de 1536 dimensões para testes offline / fallback
-    return this.createDeterministicEmbedding(truncatedText, 1536);
+    // 2. Fallback determinístico de teste (norma euclidiana L2 = 1.0)
+    return this.createDeterministicEmbedding(truncatedText, this.embeddingDimensions);
   }
 
   /**
-   * Gerador pseudo-vetorial determinístico baseado em hash semântico normalizado
+   * Gerador pseudo-vetorial determinístico para ambiente de testes offline
    */
-  private createDeterministicEmbedding(text: string, dimensions: number = 1536): number[] {
+  public createDeterministicEmbedding(text: string, dimensions: number = 1536): number[] {
     const vector = new Array(dimensions).fill(0);
     const normalized = text.toLowerCase();
-    
+
     for (let i = 0; i < normalized.length; i++) {
       const code = normalized.charCodeAt(i);
       const idx = (code * 31 + i) % dimensions;
       vector[idx] += 1.0 / (1.0 + (i % 7));
     }
 
-    // Normalização L2 (norma euclidiana = 1) para cálculo de similaridade de cosseno
     const norm = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0)) || 1.0;
     return vector.map((val) => val / norm);
   }
@@ -106,7 +161,7 @@ export class SemanticRouter {
 
     let bestMatch: SemanticMatchResult | null = null;
 
-    // 1. Consulta ao PostgreSQL com extensão pgvector
+    // 1. Consulta real ao PostgreSQL com extensão pgvector
     if (this.pool) {
       try {
         const client = await this.pool.connect();
@@ -148,21 +203,26 @@ export class SemanticRouter {
           client.release();
         }
       } catch (dbErr: any) {
-        console.warn(`[SemanticRouter]: Erro ao consultar pgvector (${dbErr.message}). Verificando fallback de arquivos locais.`);
+        if (!this.allowFallback) {
+          throw new Error(`[SemanticRouter]: Erro na consulta ao banco pgvector: ${dbErr.message}`);
+        }
+        console.warn(`[SemanticRouter]: Erro ao consultar pgvector (${dbErr.message}). Utilizando busca na taxonomia local.`);
       }
+    } else if (!this.allowFallback) {
+      throw new Error(
+        '[SemanticRouter]: Conexão com o banco vetorial pgvector não configurada. Defina DATABASE_URL no .env.'
+      );
     }
 
-    // 2. Fallback de verificação local na árvore taxonomia/ se o banco não estiver disponível
+    // 2. Fallback dinâmico: busca na árvore taxonomia/ local caso o banco esteja indisponível (testes)
     if (!bestMatch) {
-      bestMatch = this.findLocalTaxonomyMatch(sourceContent);
+      bestMatch = await this.scanLocalTaxonomy(sourceContent, embedding);
     }
 
     // 3. Regra de Decisão do Design Grimoar: Similaridade de Cosseno >= 0.82
     if (bestMatch && bestMatch.similarity >= threshold) {
-      // MODO MERGE
       let currentVerbete = bestMatch.contentMarkdown;
 
-      // Se não veio do banco, tentar ler do arquivo .md no disco
       if (!currentVerbete && bestMatch.filePath && fs.existsSync(bestMatch.filePath)) {
         currentVerbete = fs.readFileSync(bestMatch.filePath, 'utf-8');
       } else if (!currentVerbete) {
@@ -187,7 +247,6 @@ export class SemanticRouter {
       };
     }
 
-    // MODO CREATE
     console.log(
       `[SemanticRouter]: Maior similaridade encontrada: ${bestMatch ? bestMatch.similarity.toFixed(4) : '0.0000'} ` +
       `(< ${threshold}). Roteando em modo CREATE.`
@@ -202,34 +261,75 @@ export class SemanticRouter {
   }
 
   /**
-   * Fallback de busca local na taxonomia baseado em termos chave e similaridade de cosseno
+   * Varre dinamicamente a pasta taxonomia/ calculando produto escalar entre vetores
    */
-  private findLocalTaxonomyMatch(sourceContent: string): SemanticMatchResult | null {
-    const templatePath = path.resolve('taxonomia/template-verbete.md');
-    if (fs.existsSync(templatePath)) {
-      const templateContent = fs.readFileSync(templatePath, 'utf-8');
-      // Comparar similaridade de cosseno entre embeddings determinísticos locais
-      const emb1 = this.createDeterministicEmbedding(sourceContent);
-      const emb2 = this.createDeterministicEmbedding(templateContent);
+  private async scanLocalTaxonomy(sourceContent: string, sourceEmbedding: number[]): Promise<SemanticMatchResult | null> {
+    const taxonomiaDir = path.resolve('taxonomia');
+    if (!fs.existsSync(taxonomiaDir)) return null;
 
-      const dotProduct = emb1.reduce((sum, val, idx) => sum + val * emb2[idx], 0);
+    let highestSim = -1;
+    let bestFile: SemanticMatchResult | null = null;
 
-      // Se contiver palavras idênticas em destaque, ajusta a similaridade
-      const hasAffordance = sourceContent.toLowerCase().includes('affordance');
-      const finalSim = hasAffordance ? Math.max(dotProduct, 0.88) : dotProduct;
+    const findMdFiles = (dir: string): string[] => {
+      let results: string[] = [];
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          results = results.concat(findMdFiles(fullPath));
+        } else if (entry.isFile() && entry.name.endsWith('.md') && entry.name !== 'README.md') {
+          results.push(fullPath);
+        }
+      }
+      return results;
+    };
 
-      return {
-        id: 'affordance-02-02',
-        slug: 'affordance',
-        title: 'Affordance',
-        domain: '02-ux-interaction-design',
-        subdomain: '02-affordances-e-signifiers',
-        filePath: templatePath,
-        contentMarkdown: templateContent,
-        similarity: finalSim,
-      };
+    const files = findMdFiles(taxonomiaDir);
+    for (const file of files) {
+      const content = fs.readFileSync(file, 'utf-8');
+      const targetDim = sourceEmbedding.length > 0 ? sourceEmbedding.length : this.embeddingDimensions;
+      const targetEmbedding = this.createDeterministicEmbedding(content, targetDim);
+
+      // Produto escalar entre vetores unitários = Cosseno
+      let dot = 0;
+      const minLen = Math.min(sourceEmbedding.length, targetEmbedding.length);
+      for (let i = 0; i < minLen; i++) {
+        dot += (sourceEmbedding[i] || 0) * (targetEmbedding[i] || 0);
+      }
+      if (isNaN(dot)) dot = 0;
+
+      // Tenta ler o slug e título do frontmatter
+      const slugMatch = content.match(/slug:\s*["']?([^"'\r\n]+)["']?/);
+      const titleMatch = content.match(/title:\s*["']?([^"'\r\n]+)["']?/);
+      const fileSlug = (slugMatch ? slugMatch[1] : path.basename(file, '.md')).toLowerCase().trim();
+      const fileTitle = (titleMatch ? titleMatch[1] : fileSlug).toLowerCase().trim();
+
+      // Se o conteúdo de entrada mencionar diretamente o conceito/título do verbete existente
+      if (
+        (fileSlug.length > 2 && sourceContent.toLowerCase().includes(fileSlug)) ||
+        (fileTitle.length > 2 && sourceContent.toLowerCase().includes(fileTitle))
+      ) {
+        dot = Math.max(dot, 0.88);
+      }
+
+      if (dot > highestSim) {
+        highestSim = dot;
+        const relativeParts = path.relative(taxonomiaDir, file).split(path.sep);
+        const resolvedTitle = titleMatch ? titleMatch[1] : (fileSlug.charAt(0).toUpperCase() + fileSlug.slice(1).replace(/-/g, ' '));
+        bestFile = {
+          id: `${fileSlug}-local`,
+          slug: fileSlug,
+          title: resolvedTitle,
+          domain: relativeParts[0] || '02-ux-interaction-design',
+          subdomain: relativeParts[1] || '02-affordances-e-signifiers',
+          filePath: file,
+          contentMarkdown: content,
+          similarity: dot,
+        };
+      }
     }
-    return null;
+
+    return bestFile;
   }
 
   async close() {

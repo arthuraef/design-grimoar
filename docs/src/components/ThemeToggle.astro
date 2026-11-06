@@ -1,0 +1,48 @@
+---
+// ThemeToggle.astro — Notion-Style Theme Switcher
+---
+
+<button id="theme-toggle" class="notion-theme-toggle" aria-label="Alternar modo escuro/claro" title="Alternar tema">
+  <span id="theme-icon" aria-hidden="true">🌓</span>
+  <span id="theme-label" style="font-size: 12px; font-weight: 500;">Tema</span>
+</button>
+
+<script is:inline>
+  (function () {
+    const toggleBtn = document.getElementById('theme-toggle');
+    const iconSpan = document.getElementById('theme-icon');
+
+    function getPreferredTheme() {
+      const stored = localStorage.getItem('grimoar-theme');
+      if (stored === 'dark' || stored === 'light') return stored;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      if (iconSpan) {
+        iconSpan.textContent = theme === 'dark' ? '🌙' : '☀️';
+      }
+    }
+
+    // Aplicação imediata
+    const currentTheme = getPreferredTheme();
+    applyTheme(currentTheme);
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const active = document.documentElement.getAttribute('data-theme') || getPreferredTheme();
+        const nextTheme = active === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('grimoar-theme', nextTheme);
+        applyTheme(nextTheme);
+      });
+    }
+
+    // Escuta mudanças de preferência do sistema operacional
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem('grimoar-theme')) {
+        applyTheme(e.matches ? 'dark' : 'light');
+      }
+    });
+  })();
+</script>

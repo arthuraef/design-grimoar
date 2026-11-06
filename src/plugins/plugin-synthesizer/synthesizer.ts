@@ -20,6 +20,12 @@ export interface SynthesizerConfig {
   model?: string;
   baseUrl?: string;
   temperature?: number;
+  allowTestFallback?: boolean;
+}
+
+export function sanitizeBaseUrl(raw: string): string {
+  const match = raw.match(/https?:\/\/[^\s)\]]+/);
+  return (match ? match[0] : raw).replace(/\/+$/, '');
 }
 
 /**
@@ -40,6 +46,7 @@ export function resolvePromptFile(candidatePath: string): string {
 
 /**
  * Serviço do Lexicógrafo-Chefe (Agente Gerador) — DeepSeek Harness
+ * Realiza chamadas HTTP reais para LLM (DeepSeek / OpenAI) lendo do .env.
  */
 export class SynthesizerService {
   private systemPrompt: string;
@@ -47,22 +54,44 @@ export class SynthesizerService {
   private model: string;
   private baseUrl: string;
   private temperature: number;
+  private allowFallback: boolean;
 
   constructor(config: SynthesizerConfig = {}) {
     const promptPath = resolvePromptFile(config.promptPath || 'prompts/step2-lexicographer.md');
     this.systemPrompt = fs.readFileSync(promptPath, 'utf-8');
 
-    this.apiKey = config.apiKey || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
-    this.model = config.model || (process.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : 'gpt-4o');
-    this.baseUrl = config.baseUrl || (process.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com' : 'https://api.openai.com/v1');
-    this.temperature = config.temperature ?? 0.2;
+    // Leitura estrita de variáveis de ambiente do .env
+    this.apiKey =
+      config.apiKey ||
+      process.env.LEXICOGRAPHER_API_KEY ||
+      process.env.DEEPSEEK_API_KEY ||
+      process.env.OPENAI_API_KEY;
+
+    const rawBaseUrl =
+      config.baseUrl ||
+      process.env.LEXICOGRAPHER_BASE_URL ||
+      process.env.DEEPSEEK_BASE_URL ||
+      (process.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com' : 'https://api.openai.com/v1');
+    this.baseUrl = sanitizeBaseUrl(rawBaseUrl);
+
+    this.model =
+      config.model ||
+      process.env.LEXICOGRAPHER_MODEL ||
+      process.env.DEEPSEEK_MODEL ||
+      (process.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : 'gpt-4o');
+
+    this.temperature =
+      config.temperature ?? parseFloat(process.env.LEXICOGRAPHER_TEMPERATURE || '0.2');
+
+    const isTest = process.env.NODE_ENV === 'test';
+    this.allowFallback = config.allowTestFallback ?? (isTest || process.env.ALLOW_TEST_FALLBACKS === 'true');
   }
 
   /**
-   * Executa a síntese do verbete, aceitando feedback de correção para retentativas
+   * Executa a síntese do verbete via cliente HTTP real para o LLM
    */
   async synthesize(input: SynthesizerInput, feedback?: CorrectionFeedback): Promise<string> {
-    console.log(`[Lexicógrafo]: Sintetizando verbete em [MODO: ${input.mode}]...`);
+    console.log(`[Lexicógrafo]: Sintetizando verbete em [MODO: ${input.mode}] via ${this.model}...`);
 
     const messageParts: string[] = [
       `[MODO: ${input.mode}]`,
@@ -103,40 +132,65 @@ export class SynthesizerService {
 
     const userMessage = messageParts.join('\n\n');
 
-    // Se houver chave de API configurada, executa chamada HTTP real
+    // 1. Cliente HTTP Real para LLM (DeepSeek / OpenAI / Endpoint compatível)
     if (this.apiKey) {
-      const endpoint = this.baseUrl.endsWith('/') ? `${this.baseUrl}chat/completions` : `${this.baseUrl}/chat/completions`;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [
-            { role: 'system', content: this.systemPrompt },
-            { role: 'user', content: userMessage },
-          ],
-          temperature: this.temperature,
-        }),
-      });
+      const endpoint = this.baseUrl.endsWith('/')
+        ? `${this.baseUrl}chat/completions`
+        : `${this.baseUrl}/chat/completions`;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`[Lexicógrafo API Error ${response.status}]: ${errorText}`);
+      console.log(`[Lexicógrafo]: Enviando requisição real para ${endpoint} (${this.model})...`);
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: this.model,
+            messages: [
+              { role: 'system', content: this.systemPrompt },
+              { role: 'user', content: userMessage },
+            ],
+            temperature: this.temperature,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`[Lexicógrafo API Error HTTP ${response.status}]: ${errorText}`);
+        }
+
+        const data: any = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (!content) {
+          throw new Error('[Lexicógrafo]: API retornou resposta vazia.');
+        }
+        return content.trim();
+      } catch (err: any) {
+        if (!this.allowFallback) {
+          throw err;
+        }
+        console.warn(`[Lexicógrafo]: Erro na chamada real à API (${err.message}). Utilizando fallback determinístico de teste.`);
       }
-
-      const data: any = await response.json();
-      return (data.choices?.[0]?.message?.content || '').trim();
     }
 
-    // Fallback gerador canônico determinístico (usado para testes ou offline)
+    // 2. Se não houver chave em produção, lança erro explícito
+    if (!this.allowFallback) {
+      throw new Error(
+        '[Lexicógrafo]: Chave de API não configurada no .env. ' +
+        'Defina LEXICOGRAPHER_API_KEY ou DEEPSEEK_API_KEY.'
+      );
+    }
+
+    // 3. Fallback determinístico estrito para ambiente de testes
+    console.warn('[Lexicógrafo]: Modo de teste ativo — utilizando gerador sintético de teste.');
     return this.generateDeterministicFallback(input, feedback);
   }
 
   /**
-   * Fallback sintético determinístico para ambientes de teste sem chave de LLM
+   * Fallback sintético determinístico para testes unitários offline
    */
   private generateDeterministicFallback(input: SynthesizerInput, feedback?: CorrectionFeedback): string {
     const slug = input.sourceContent.toLowerCase().includes('affordance') ? 'affordance' : 'usabilidade-cognitiva';

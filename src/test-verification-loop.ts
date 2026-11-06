@@ -1,3 +1,7 @@
+import dotenv from 'dotenv';
+dotenv.config();
+process.env.NODE_ENV = process.env.NODE_ENV || 'test';
+
 import { Context } from '@deepseek-ai/cordis';
 import { SynthesizerService, SynthesizerInput, CorrectionFeedback } from './plugins/plugin-synthesizer/synthesizer.js';
 import { AcademicValidatorService, AcademicAuditResult } from './plugins/plugin-academic-validator/validator.js';

@@ -1,0 +1,142 @@
+---
+import NotionLayout from '../layouts/NotionLayout.astro';
+import { getCollection } from 'astro:content';
+
+let allVerbetes: any[] = [];
+try {
+  allVerbetes = await getCollection('docs');
+} catch (e) {
+  allVerbetes = [];
+}
+
+const domains = [
+  { id: '01-psicologia-cognitiva', code: '01', title: 'Psicologia Cognitiva', icon: '🧠', desc: 'Carga cognitiva, modelos mentais, vieses heurísticos e percepção visual.' },
+  { id: '02-ux-interaction-design', code: '02', title: 'UX & Interaction Design', icon: '📐', desc: 'Affordances, signifiers, arquitetura de informação e heurísticas de usabilidade.' },
+  { id: '03-ui-visual-design', code: '03', title: 'UI & Visual Design', icon: '🎨', desc: 'Tipografia editorial, contraste perceptual, teoria da cor e ritmo espacial.' },
+  { id: '04-design-systems', code: '04', title: 'Design Systems', icon: '🧱', desc: 'Design tokens, componentes atômicos, acessibilidade e governança de escala.' },
+  { id: '05-product-design-strategy', code: '05', title: 'Product Design Strategy', icon: '🎯', desc: 'Problem framing, discovery contínuo, hipóteses de valor e métricas de impacto.' },
+  { id: '06-designops-engineering', code: '06', title: 'DesignOps & Engineering', icon: '⚙️', desc: 'Handoff determinístico, automação de esteiras CI/CD e auditoria de qualidade.' },
+];
+
+const base = import.meta.env.BASE_URL || '/';
+const cleanBase = base ? base.replace(/\/$/, '') : '';
+---
+
+<NotionLayout title="Design Grimoar — Enciclopédia Canônica de Product Design" currentSlug="">
+  <!-- Notion Page Icon -->
+  <div class="notion-page-icon">📓</div>
+
+  <!-- Notion Page Title -->
+  <h1 class="notion-page-title">Design Grimoar</h1>
+
+  <!-- Notion Properties Block -->
+  <div class="notion-properties">
+    <div class="notion-property-row">
+      <div class="notion-property-key"><span>🏛️</span> <span>Tipo</span></div>
+      <div class="notion-property-value">Tratado Canônico & Enciclopédia Autônoma</div>
+    </div>
+    <div class="notion-property-row">
+      <div class="notion-property-key"><span>🌐</span> <span>Front-end</span></div>
+      <div class="notion-property-value">GitHub Pages (Notion-like Experience)</div>
+    </div>
+    <div class="notion-property-row">
+      <div class="notion-property-key"><span>🧠</span> <span>Orquestrador</span></div>
+      <div class="notion-property-value">DeepSeek Harness + Cordis Framework</div>
+    </div>
+    <div class="notion-property-row">
+      <div class="notion-property-key"><span>🏷️</span> <span>Status</span></div>
+      <div class="notion-property-value"><span class="notion-tag">canonical</span></div>
+    </div>
+  </div>
+
+  <div class="notion-content">
+    <!-- Callout Manifesto -->
+    <div class="notion-callout">
+      <div class="notion-callout-icon">🕯️</div>
+      <div class="notion-callout-body">
+        <strong>Manifesto Curatorial:</strong> O design não habita a camada decorativa do artefato; 
+        constitui a estrutura invisível da cognição humana. O Grimoar existe para destilar o conhecimento disperso da indústria 
+        em um cânone rigoroso, ancorado na ciência da percepção e na computação aplicada.
+      </div>
+    </div>
+
+    <!-- Regra de Nomenclatura Callout -->
+    <div class="notion-callout">
+      <div class="notion-callout-icon">◽️</div>
+      <div class="notion-callout-body">
+        <strong>Diretriz de Nomenclatura:</strong> Todos os termos técnicos, <em>frameworks</em> e conceitos da indústria 
+        são mantidos estritamente em seu idioma original (<em>English</em>). A tradução para o Português do Brasil ocorre 
+        no máximo uma única vez, na sentença de abertura do verbete, estritamente para contextualização inicial.
+      </div>
+    </div>
+
+    <h2>Taxonomia Canônica & Domínios Oficiais</h2>
+    <p>
+      O Grimoar organiza o conhecimento em 6 domínios estruturais. Cada verbete é sintetizado de fontes canônicas 
+      e auditado rigorosamente pela academia antes da publicação.
+    </p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin: 28px 0;">
+      {domains.map((dom) => {
+        const verbetesCount = allVerbetes.filter((v) => {
+          const d = v.data?.domain || (v.id && v.id.startsWith(dom.id) ? dom.id : '');
+          return d === dom.id;
+        }).length;
+
+        return (
+          <div style="border: 1px solid var(--border-subtle); border-radius: 6px; padding: 20px; background-color: var(--bg-surface); transition: background-color 0.15s ease;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 24px;">{dom.icon}</span>
+              <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-faint); letter-spacing: 0.05em;">
+                Domínio {dom.code}
+              </span>
+            </div>
+            <h3 style="font-size: 16px; margin-top: 0; margin-bottom: 6px; color: var(--text-main);">
+              {dom.title}
+            </h3>
+            <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+              {dom.desc}
+            </p>
+            <div style="font-size: 12px; color: var(--text-faint);">
+              {verbetesCount === 1 ? '1 verbete catalogado' : `${verbetesCount} verbetes catalogados`}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    <h2>Verbetes em Destaque</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Verbete</th>
+          <th>Domínio</th>
+          <th>Status</th>
+          <th>Âncoras Acadêmicas</th>
+        </tr>
+      </thead>
+      <tbody>
+        {allVerbetes.map((verbete) => {
+          const slug = verbete.data?.slug || verbete.slug || verbete.id.replace(/\.md$/, '');
+          const title = verbete.data?.title || slug;
+          const domain = verbete.data?.domain || 'Cânone';
+          const status = verbete.data?.status || 'canonical';
+          const anchors = verbete.data?.academic_anchors?.slice(0, 2)?.join(', ') || 'Sob revisão';
+
+          return (
+            <tr>
+              <td>
+                <a href={`${cleanBase}/${slug}`} class="notion-wikilink" style="font-weight: 600;">
+                  📄 {title}
+                </a>
+              </td>
+              <td style="font-size: 13px; color: var(--text-muted);">{domain}</td>
+              <td><span class="notion-tag">{status}</span></td>
+              <td style="font-size: 12.5px; color: var(--text-muted);">{anchors}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</NotionLayout>

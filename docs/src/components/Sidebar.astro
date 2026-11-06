@@ -1,0 +1,79 @@
+---
+import { getCollection } from 'astro:content';
+
+interface Props {
+  currentSlug?: string;
+  base?: string;
+}
+
+const { currentSlug = '', base = '' } = Astro.props;
+
+// Lista canônica de domínios com títulos e ícones refinados
+const domains = [
+  { id: '01-psicologia-cognitiva', label: '01. Psicologia Cognitiva', icon: '🧠' },
+  { id: '02-ux-interaction-design', label: '02. UX & Interaction', icon: '📐' },
+  { id: '03-ui-visual-design', label: '03. UI & Visual Design', icon: '🎨' },
+  { id: '04-design-systems', label: '04. Design Systems', icon: '🧱' },
+  { id: '05-product-design-strategy', label: '05. Product Strategy', icon: '🎯' },
+  { id: '06-designops-engineering', label: '06. DesignOps & Eng.', icon: '⚙️' },
+];
+
+let allVerbetes: any[] = [];
+try {
+  allVerbetes = await getCollection('docs');
+} catch (e) {
+  allVerbetes = [];
+}
+
+const cleanBase = base ? base.replace(/\/$/, '') : '';
+---
+
+<aside class="notion-sidebar">
+  <div class="notion-sidebar-header">
+    <a href={`${cleanBase}/`} class="notion-brand">
+      <span class="notion-brand-icon">📓</span>
+      <span>Design Grimoar</span>
+    </a>
+  </div>
+
+  <nav class="notion-sidebar-nav">
+    <a href={`${cleanBase}/`} class={`notion-nav-item ${currentSlug === '' ? 'active' : ''}`}>
+      <span class="notion-nav-icon">◽️</span>
+      <span>Início / Cânone</span>
+    </a>
+
+    {domains.map((domain) => {
+      const verbetesInDomain = allVerbetes.filter((v) => {
+        const d = v.data?.domain || (v.id && v.id.startsWith(domain.id) ? domain.id : '');
+        return d === domain.id;
+      });
+
+      return (
+        <div class="notion-sidebar-section">
+          <div class="notion-sidebar-title">{domain.label}</div>
+          {verbetesInDomain.length === 0 ? (
+            <div style="font-size: 12px; color: var(--text-faint); padding: 4px 10px; font-style: italic;">
+              Em curadoria...
+            </div>
+          ) : (
+            verbetesInDomain.map((verbete) => {
+              const slug = verbete.data?.slug || verbete.slug || verbete.id.replace(/\.md$/, '');
+              const title = verbete.data?.title || slug;
+              const isActive = currentSlug === slug;
+              const linkHref = `${cleanBase}/${slug}`;
+
+              return (
+                <a href={linkHref} class={`notion-nav-item ${isActive ? 'active' : ''}`}>
+                  <span class="notion-nav-icon">📄</span>
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {title}
+                  </span>
+                </a>
+              );
+            })
+          )}
+        </div>
+      );
+    })}
+  </nav>
+</aside>

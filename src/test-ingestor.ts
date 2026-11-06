@@ -1,3 +1,7 @@
+import dotenv from 'dotenv';
+dotenv.config();
+process.env.NODE_ENV = process.env.NODE_ENV || 'test';
+
 import { Context } from '@deepseek-ai/cordis';
 import { sanitizeScrapedContent } from './plugins/plugin-ingestor/sanitizer.js';
 import { SemanticRouter, COSINE_SIMILARITY_THRESHOLD } from './plugins/plugin-ingestor/semantic-router.js';

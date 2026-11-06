@@ -5,11 +5,15 @@
 
 # Dependencies
 node_modules/
-package-lock.json
+docs/node_modules/
+!docs/package-lock.json
 
 # Builds
 dist/
 build/
+.astro/
+docs/dist/
+docs/.astro/
 
 # Logs
 logs/
