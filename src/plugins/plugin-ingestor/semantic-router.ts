@@ -87,8 +87,13 @@ export class SemanticRouter {
           input: truncatedText,
         };
 
-        // Adiciona dimensions se o modelo for da família text-embedding-3
-        if (this.embeddingModel.includes('text-embedding-3')) {
+        // Envia dimensions quando configurado (compatível com OpenAI text-embedding-3 e Google Gemini embedding-001)
+        if (
+          this.embeddingDimensions &&
+          (this.embeddingModel.includes('text-embedding-3') ||
+            this.embeddingModel.includes('gemini') ||
+            this.embeddingModel.includes('embedding'))
+        ) {
           payload.dimensions = this.embeddingDimensions;
         }
 
@@ -109,6 +114,9 @@ export class SemanticRouter {
         const data: any = await response.json();
         const embedding = data.data?.[0]?.embedding;
         if (Array.isArray(embedding) && embedding.length > 0) {
+          if (this.embeddingDimensions && embedding.length > this.embeddingDimensions) {
+            return embedding.slice(0, this.embeddingDimensions);
+          }
           return embedding;
         }
       } catch (err: any) {

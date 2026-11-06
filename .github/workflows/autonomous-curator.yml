@@ -78,11 +78,11 @@ jobs:
           SIMILARITY_THRESHOLD: '0.82'
           LEXICOGRAPHER_API_KEY: ${{ secrets.LEXICOGRAPHER_API_KEY }}
           LEXICOGRAPHER_BASE_URL: ${{ secrets.LEXICOGRAPHER_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai' }}
-          LEXICOGRAPHER_MODEL: ${{ secrets.LEXICOGRAPHER_MODEL || 'gemini-2.5-flash' }}
+          LEXICOGRAPHER_MODEL: ${{ secrets.LEXICOGRAPHER_MODEL || 'gemini-3.5-flash' }}
           LEXICOGRAPHER_TEMPERATURE: '0.2'
           ACADEMIC_AUDITOR_API_KEY: ${{ secrets.ACADEMIC_AUDITOR_API_KEY }}
           ACADEMIC_AUDITOR_BASE_URL: ${{ secrets.ACADEMIC_AUDITOR_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai' }}
-          ACADEMIC_AUDITOR_MODEL: ${{ secrets.ACADEMIC_AUDITOR_MODEL || 'gemini-2.5-pro' }}
+          ACADEMIC_AUDITOR_MODEL: ${{ secrets.ACADEMIC_AUDITOR_MODEL || 'gemini-3.5-flash-lite' }}
           ACADEMIC_AUDITOR_TEMPERATURE: '0.1'
           VERIFICATION_LOOP_MAX_ATTEMPTS: '3'
           GITHUB_TOKEN: ${{ secrets.PAT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}

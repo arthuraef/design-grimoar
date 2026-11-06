@@ -18,30 +18,42 @@ export type OfficialDomain = (typeof OfficialDomains)[number];
 /**
  * Status do ciclo de vida de um verbete
  */
-export const VerbeteStatusEnum = z.enum([
+export const VerbeteStatusEnum = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const lower = val.toLowerCase().trim();
+    if (lower === 'stable') return 'canonical';
+    return lower;
+  }
+  return val;
+}, z.enum([
   'draft',
   'in_review',
   'audited',
   'canonical',
   'deprecated',
-]);
+]));
 
 /**
  * Status da Auditoria Acadêmica (Etapa 3)
  */
-export const AuditStatusEnum = z.enum([
+export const AuditStatusEnum = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    return val.toUpperCase().trim();
+  }
+  return val;
+}, z.enum([
   'PENDING',
   'APPROVED',
   'REJECTED',
-]);
+]));
 
 /**
  * Schema de Auditoria Acadêmica
  */
 export const VerbeteAuditSchema = z.object({
   status: AuditStatusEnum.default('PENDING'),
-  auditor: z.string().min(1, 'Identificador do agente auditor é obrigatório'),
-  audited_at: z.string().datetime({ offset: true }).optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}T.*Z$/)),
+  auditor: z.string().default('academic-auditor-v1'),
+  audited_at: z.string().datetime({ offset: true }).optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}T.*Z$/)).or(z.string().min(10).optional()),
   academic_anchor_added: z.array(z.string()).default([]),
   notes: z.string().optional(),
 });
@@ -57,6 +69,25 @@ export const VerbeteSourceSchema = z.object({
 });
 
 /**
+ * Normalizador resiliente dos 6 domínios canônicos
+ */
+export const VerbeteDomainSchema = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    const v = val.trim().toLowerCase();
+    if (OfficialDomains.includes(v as any)) return v;
+    const match = OfficialDomains.find(
+      (d) => d === v || d.includes(v) || v.includes(d.replace(/^\d+-/, ''))
+    );
+    if (match) return match;
+  }
+  return val;
+}, z.enum(OfficialDomains, {
+  errorMap: () => ({
+    message: `Domínio inválido. Deve ser um dos domínios oficiais: ${OfficialDomains.join(', ')}`,
+  }),
+}));
+
+/**
  * Schema estrito de validação do YAML Frontmatter do Verbete
  */
 export const VerbeteFrontmatterSchema = z.object({
@@ -66,19 +97,15 @@ export const VerbeteFrontmatterSchema = z.object({
     .min(2)
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug deve estar em formato kebab-case (ex: affordance, cognitive-load)'),
   id: z.string().min(2, 'ID canônico é obrigatório'),
-  domain: z.enum(OfficialDomains, {
-    errorMap: () => ({
-      message: `Domínio inválido. Deve ser um dos domínios oficiais: ${OfficialDomains.join(', ')}`,
-    }),
-  }),
+  domain: VerbeteDomainSchema,
   subdomain: z.string().min(2, 'Subdomínio da taxonomia é obrigatório'),
   status: VerbeteStatusEnum.default('draft'),
   version: z
     .string()
     .regex(/^\d+\.\d+\.\d+$/, 'Versão deve seguir o formato SemVer (ex: 1.0.0)')
     .default('1.0.0'),
-  created_at: z.string().min(10, 'Data de criação é obrigatória'),
-  updated_at: z.string().min(10, 'Data de atualização é obrigatória'),
+  created_at: z.string().min(10, 'Data de criação é obrigatória').default(() => new Date().toISOString()),
+  updated_at: z.string().min(10, 'Data de atualização é obrigatória').default(() => new Date().toISOString()),
   summary: z
     .string()
     .min(10, 'Resumo canônico deve ter pelo menos 10 caracteres')

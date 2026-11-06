@@ -30,10 +30,10 @@ const secretsToSet: Record<string, string> = {
   EMBEDDING_MODEL: envParsed.EMBEDDING_MODEL || 'gemini-embedding-001',
   LEXICOGRAPHER_API_KEY: envParsed.LEXICOGRAPHER_API_KEY || '',
   LEXICOGRAPHER_BASE_URL: envParsed.LEXICOGRAPHER_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
-  LEXICOGRAPHER_MODEL: envParsed.LEXICOGRAPHER_MODEL || 'gemini-2.5-flash',
+  LEXICOGRAPHER_MODEL: envParsed.LEXICOGRAPHER_MODEL || 'gemini-3.5-flash',
   ACADEMIC_AUDITOR_API_KEY: envParsed.ACADEMIC_AUDITOR_API_KEY || '',
   ACADEMIC_AUDITOR_BASE_URL: envParsed.ACADEMIC_AUDITOR_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
-  ACADEMIC_AUDITOR_MODEL: envParsed.ACADEMIC_AUDITOR_MODEL || 'gemini-2.5-pro',
+  ACADEMIC_AUDITOR_MODEL: envParsed.ACADEMIC_AUDITOR_MODEL || 'gemini-3.5-flash-lite',
   NOTIFICATIONS_WEBHOOK_URL: envParsed.NOTIFICATIONS_WEBHOOK_URL || '',
   PAT_GITHUB_TOKEN: GITHUB_TOKEN,
 };
