@@ -7,6 +7,8 @@ import publisherPlugin, { PublisherPlugin } from './plugins/plugin-publisher/ind
 import hermesNotifierPlugin, { HermesNotifierPlugin } from './plugins/plugin-hermes-notifier/index.js';
 import { VerificationLoopController } from './plugins/verification-loop.js';
 import { PipelineExecutionResult } from './types/index.js';
+import { ExecutionLock } from './utils/lock.js';
+import { withExponentialBackoff } from './utils/retry.js';
 
 dotenv.config();
 
@@ -23,8 +25,10 @@ export class GrimoarOrchestrator {
   private publisher: PublisherPlugin;
   private notifier: HermesNotifierPlugin;
   private loopController: VerificationLoopController;
+  private lock: ExecutionLock;
 
   constructor(protected ctx: Context) {
+    this.lock = new ExecutionLock();
     // 1. Ingestor: Firecrawl MCP / REST + VibeVoice ASR + pgvector + Modo Furtivo (Rate Limit 2-3 verbetes/h)
     this.ingestor = new IngestorPlugin(ctx, {
       similarityThreshold: parseFloat(process.env.SIMILARITY_THRESHOLD || '0.82'),
@@ -113,13 +117,21 @@ export class GrimoarOrchestrator {
 
     if (isAudio) {
       console.log(`[Etapa 1]: Ingestão de áudio via VibeVoice ASR (0.5B)...`);
-      const { transcript, route } = await this.ingestor.ingestUXPodcast(urlOrSource);
+      const { transcript, route } = await withExponentialBackoff(
+        () => this.ingestor.ingestUXPodcast(urlOrSource),
+        { maxRetries: 3, initialDelayMs: 3000 },
+        `Ingestão Áudio (${urlOrSource})`
+      );
       contentToProcess = transcript.sanitizedTranscript;
       routingMode = route.mode;
       currentVerbete = route.currentVerbete;
     } else {
       console.log(`[Etapa 1]: Ingestão web via Firecrawl MCP com Sanitização de Injeção...`);
-      const { document, route } = await this.ingestor.ingestWeb(urlOrSource);
+      const { document, route } = await withExponentialBackoff(
+        () => this.ingestor.ingestWeb(urlOrSource),
+        { maxRetries: 3, initialDelayMs: 3000 },
+        `Ingestão Web (${urlOrSource})`
+      );
       contentToProcess = document.sanitizedContent;
       routingMode = route.mode;
       currentVerbete = route.currentVerbete;
@@ -222,6 +234,62 @@ export class GrimoarOrchestrator {
 
     return results;
   }
+
+  /**
+   * Inicia a varredura autônoma contínua do Design Grimoar com lock determinístico e bootstrap vetorial.
+   * Percorre ciclicamente as 7 fontes web canônicas e o UXPodcast com rate limit furtivo (15 a 40 min de jitter).
+   */
+  async startAutonomousScanner(): Promise<void> {
+    if (!this.lock.acquire()) {
+      console.warn('⚠️ [Varredura Autônoma]: Instância paralela já ativa. Encerrando chamada concorrente.');
+      return;
+    }
+
+    const cleanup = () => {
+      this.lock.release();
+    };
+    process.once('SIGINT', () => { cleanup(); process.exit(0); });
+    process.once('SIGTERM', () => { cleanup(); process.exit(0); });
+    process.once('exit', () => { cleanup(); });
+
+    console.log(`\n======================================================`);
+    console.log(`🌌 [Design Grimoar]: Varredura Autônoma Iniciada em Segundo Plano`);
+    console.log(`🛡️ Rate Limit: 2 a 3 verbetes/hora | Jitter: 15 a 40 minutos`);
+    console.log(`🌐 Fontes Monitoradas: 7 fontes web + UXPodcast ASR`);
+    console.log(`======================================================\n`);
+
+    // Cold Start: Bootstrap e backfill de verbetes pré-existentes na taxonomia para o pgvector
+    try {
+      await this.publisher.bootstrapExistingVerbetes('taxonomia');
+    } catch (bootErr: any) {
+      console.warn(`[Cold Start]: Aviso durante bootstrap vetorial: ${bootErr.message}`);
+    }
+
+    const canonicalQueue = [
+      'nngroup',
+      'ixdf',
+      'lawsofux',
+      'apple-hig',
+      'material-design',
+      'ux-collective',
+      'design-systems-repo',
+      'uxpodcast',
+    ];
+
+    while (true) {
+      console.log(`\n[${new Date().toISOString()}] 🔍 Iniciando ciclo de varredura autônoma...`);
+      try {
+        await this.processQueue(canonicalQueue);
+        console.log(`[${new Date().toISOString()}] ✅ Ciclo de varredura concluído com sucesso.`);
+      } catch (err: any) {
+        console.error(`[${new Date().toISOString()}] ⚠️ Erro no ciclo de varredura:`, err.message);
+      }
+
+      const restMinutes = 60;
+      console.log(`💤 [Varredura]: Aguardando ${restMinutes} minutos para a próxima rodada de varredura...`);
+      await new Promise((resolve) => setTimeout(resolve, restMinutes * 60 * 1000));
+    }
+  }
 }
 
 // Registro de todos os plugins no Cordis
@@ -269,5 +337,10 @@ ctx.plugin((ctx) => {
           process.exit(1);
         });
     }
+  } else if (process.env.NODE_ENV !== 'test') {
+    // Inicialização da Varredura Autônoma em background quando executado sem alvos manuais
+    orchestrator.startAutonomousScanner().catch((err) => {
+      console.error('❌ Erro fatal no daemon autônomo:', err);
+    });
   }
 });

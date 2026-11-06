@@ -1,0 +1,26 @@
+# Git & Configurações Locais
+.git
+.github
+.env
+.env.*
+!.env.example
+.DS_Store
+.antigravity
+
+# Dependências & Compilações
+node_modules
+dist
+logs
+coverage
+*.log
+
+# Front-end Astro Docs (Gerado via CI/CD no GitHub Pages)
+docs/node_modules
+docs/dist
+docs/.astro
+
+# Arquivos temporários
+*.tmp
+*.bak
+.grimoar-scanner.lock
+.test-scanner.lock

@@ -11,7 +11,12 @@
     "build:docs": "npm --prefix docs run build",
     "dev:docs": "npm --prefix docs run dev",
     "test": "NODE_ENV=test tsx src/test-schema.ts && NODE_ENV=test tsx src/test-ingestor.ts && NODE_ENV=test tsx src/test-verification-loop.ts && NODE_ENV=test tsx src/test-publisher-notifier.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "cloud:status": "docker compose ps",
+    "cloud:logs": "docker compose logs -f --tail=100",
+    "cloud:restart": "docker compose restart deepseek-harness",
+    "cloud:down": "docker compose down",
+    "db:backup": "docker compose exec -T pgvector pg_dump -U grimoar design_grimoar | gzip > backup-$(date +%Y%m%d%H%M%S).sql.gz"
   },
   "keywords": [
     "design",

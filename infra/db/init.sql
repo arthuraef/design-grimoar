@@ -4,7 +4,7 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Tabela Canônica de Verbetes
+-- Tabela Canônica de Verbetes (Sincronizada com o Schema Zod e PublisherService)
 CREATE TABLE IF NOT EXISTS verbetes (
     id VARCHAR(128) PRIMARY KEY,
     slug VARCHAR(128) NOT NULL UNIQUE,
@@ -14,12 +14,23 @@ CREATE TABLE IF NOT EXISTS verbetes (
     status VARCHAR(32) NOT NULL DEFAULT 'draft',
     version VARCHAR(16) NOT NULL DEFAULT '1.0.0',
     summary TEXT NOT NULL,
-    frontmatter JSONB NOT NULL,
+    tags JSONB DEFAULT '[]'::jsonb,
+    aliases JSONB DEFAULT '[]'::jsonb,
+    academic_anchors JSONB DEFAULT '[]'::jsonb,
+    audit_status VARCHAR(32) DEFAULT 'APPROVED',
+    frontmatter JSONB DEFAULT '{}'::jsonb,
     content_markdown TEXT NOT NULL,
     file_path VARCHAR(512),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migrações defensivas para instâncias com banco já inicializado
+ALTER TABLE verbetes ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE verbetes ADD COLUMN IF NOT EXISTS aliases JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE verbetes ADD COLUMN IF NOT EXISTS academic_anchors JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE verbetes ADD COLUMN IF NOT EXISTS audit_status VARCHAR(32) DEFAULT 'APPROVED';
+ALTER TABLE verbetes ADD COLUMN IF NOT EXISTS frontmatter JSONB DEFAULT '{}'::jsonb;
 
 -- Tabela de Embeddings para Busca Semântica
 CREATE TABLE IF NOT EXISTS verbete_embeddings (
@@ -28,7 +39,7 @@ CREATE TABLE IF NOT EXISTS verbete_embeddings (
     section_title VARCHAR(255) NOT NULL,
     chunk_index INT NOT NULL,
     content_chunk TEXT NOT NULL,
-    embedding vector(1536), -- Suporta embeddings de 1536 dimensões (ex: OpenAI / DeepSeek / Ollama)
+    embedding vector(1536), -- Embeddings de 1536 dimensões (OpenAI / DeepSeek / Gemini)
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

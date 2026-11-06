@@ -13,6 +13,10 @@ export class PublisherPlugin {
   async publish(frontmatter: VerbeteFrontmatter, markdownContent: string): Promise<PublishResult> {
     return this.service.publish(frontmatter, markdownContent);
   }
+
+  async bootstrapExistingVerbetes(taxonomyDir?: string): Promise<number> {
+    return this.service.bootstrapExistingVerbetes(taxonomyDir);
+  }
 }
 
 export default function apply(ctx: Context, config: PublisherConfig = {}) {

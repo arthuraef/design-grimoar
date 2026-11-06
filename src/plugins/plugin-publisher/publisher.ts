@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import pg from 'pg';
 import { toSql } from 'pgvector/pg';
-import { VerbeteFrontmatter, MANDATORY_SECTIONS } from '../../schema.js';
+import { VerbeteFrontmatter, MANDATORY_SECTIONS, extractFrontmatterAndBody, validateVerbete } from '../../schema.js';
 import { SemanticRouter } from '../plugin-ingestor/semantic-router.js';
 
 const execFileAsync = promisify(execFile);
@@ -39,8 +39,9 @@ export interface PublisherConfig {
  * Realiza:
  * 1. Gravação do .md canônico em taxonomia/ (SSOT)
  * 2. Gravação direta na pasta de conteúdo do front-end estático Notion-like (docs/src/content/docs/)
- * 3. Commit e Push atômico para o GitHub (disparando CI/CD do GitHub Pages)
+ * 3. Commit e Push atômico para o GitHub com rebase defensivo e autostash
  * 4. Atualização e indexação vetorial no PostgreSQL (pgvector) com embeddings reais de 1536 dims
+ * 5. Bootstrap e Backfill automático de verbetes pré-existentes no disco para o pgvector (Cold Start)
  */
 export class PublisherService {
   private pool?: pg.Pool;
@@ -70,6 +71,139 @@ export class PublisherService {
 
     const isTest = process.env.NODE_ENV === 'test';
     this.allowFallback = config.allowTestFallback ?? (isTest || process.env.ALLOW_TEST_FALLBACKS === 'true');
+  }
+
+  /**
+   * Limpa locks órfãos do Git deixados por encerramentos abruptos
+   */
+  public cleanGitLocks(): void {
+    const candidateLocks = [
+      '.git/index.lock',
+      '.git/refs/heads/main.lock',
+      '.git/refs/heads/infra/oracle-cloud.lock',
+      '.git/HEAD.lock',
+    ];
+    for (const lockRel of candidateLocks) {
+      const fullPath = path.resolve(lockRel);
+      if (fs.existsSync(fullPath)) {
+        try {
+          fs.unlinkSync(fullPath);
+          console.log(`🧹 [Publisher - Git]: Lock órfão removido com sucesso: ${lockRel}`);
+        } catch (err: any) {
+          console.warn(`⚠️ [Publisher - Git]: Não foi possível remover lock ${lockRel}: ${err.message}`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Garante identidade autônoma para operações Git no container/host
+   */
+  public async ensureGitIdentity(): Promise<void> {
+    try {
+      await execFileAsync('git', ['config', 'user.name']);
+    } catch {
+      const name = process.env.GIT_AUTHOR_NAME || 'Design Grimoar Agent';
+      await execFileAsync('git', ['config', 'user.name', name]).catch(() => {});
+      console.log(`[Publisher - Git]: Configurado user.name = "${name}"`);
+    }
+
+    try {
+      await execFileAsync('git', ['config', 'user.email']);
+    } catch {
+      const email = process.env.GIT_AUTHOR_EMAIL || 'grimoar@designgrimoar.canonical';
+      await execFileAsync('git', ['config', 'user.email', email]).catch(() => {});
+      console.log(`[Publisher - Git]: Configurado user.email = "${email}"`);
+    }
+
+    // Configuração de safe.directory para evitar conflito de UID/GID em bind mounts
+    try {
+      await execFileAsync('git', ['config', '--global', '--add', 'safe.directory', '/app']).catch(() => {});
+      await execFileAsync('git', ['config', '--global', '--add', 'safe.directory', '*']).catch(() => {});
+    } catch {
+      // Ignora se git global config não puder ser alterado
+    }
+  }
+
+  /**
+   * Sincronização prévia antes do push com rebase e autostash
+   */
+  private async syncRemoteBeforePush(pushTarget: string): Promise<void> {
+    try {
+      console.log(`[Publisher - Git]: Sincronizando com origin/${this.githubBranch} (rebase + autostash)...`);
+      await execFileAsync('git', ['fetch', pushTarget, this.githubBranch]);
+      await execFileAsync('git', ['pull', '--rebase', '--autostash', pushTarget, this.githubBranch]);
+      console.log('[Publisher - Git]: Sincronização remota via rebase concluída com sucesso.');
+    } catch (err: any) {
+      console.warn(`[Publisher - Git]: Aviso na sincronização pré-push (${err.message}). Prosseguindo com push padrão.`);
+    }
+  }
+
+  /**
+   * Bootstrap e Backfill Vetorial (Cold Start):
+   * Verifica todos os arquivos .md em taxonomia/. Se algum verbete existir no disco
+   * mas não estiver registrado no pgvector, indexa automaticamente antes da ingestão.
+   */
+  public async bootstrapExistingVerbetes(taxonomyDir: string = 'taxonomia'): Promise<number> {
+    const rootPath = path.resolve(taxonomyDir);
+    if (!fs.existsSync(rootPath)) {
+      return 0;
+    }
+
+    console.log(`\n🔍 [Publisher - Bootstrap]: Verificando verbetes existentes em "${taxonomyDir}" para cold start vetorial...`);
+    let indexedCount = 0;
+
+    const findMarkdownFiles = (dir: string): string[] => {
+      let results: string[] = [];
+      const list = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of list) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          results = results.concat(findMarkdownFiles(fullPath));
+        } else if (entry.isFile() && entry.name.endsWith('.md') && !entry.name.startsWith('template-')) {
+          results.push(fullPath);
+        }
+      }
+      return results;
+    };
+
+    const files = findMarkdownFiles(rootPath);
+    console.log(`   - Arquivos .md identificados na taxonomia: ${files.length}`);
+
+    for (const file of files) {
+      try {
+        const content = fs.readFileSync(file, 'utf-8');
+        const validation = validateVerbete(content);
+        if (!validation.isValid || !validation.frontmatter) {
+          continue;
+        }
+
+        const frontmatter = validation.frontmatter;
+
+        // Se tiver pool do Postgres, verificar se já está indexado
+        if (this.pool) {
+          try {
+            const checkRes = await this.pool.query(
+              'SELECT id FROM verbetes WHERE slug = $1 LIMIT 1;',
+              [frontmatter.slug]
+            );
+
+            if (checkRes.rows.length === 0) {
+              console.log(`📥 [Publisher - Bootstrap]: Indexando no pgvector: "${frontmatter.title}" (${frontmatter.slug})...`);
+              await this.updateVectorDatabase(frontmatter, content, file);
+              indexedCount++;
+            }
+          } catch (dbErr: any) {
+            console.warn(`[Publisher - Bootstrap]: Aviso ao verificar verbete no banco: ${dbErr.message}`);
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[Publisher - Bootstrap]: Erro ao processar arquivo ${file}:`, err.message);
+      }
+    }
+
+    console.log(`✅ [Publisher - Bootstrap]: Finalizado. ${indexedCount} verbetes novos indexados no pgvector.\n`);
+    return indexedCount;
   }
 
   /**
@@ -127,7 +261,7 @@ export class PublisherService {
   }
 
   /**
-   * Realiza o commit e push atômico no Git
+   * Realiza o commit e push atômico no Git com blindagem contra locks e non-fast-forward
    */
   private async commitAndPush(
     filePaths: string[],
@@ -136,6 +270,10 @@ export class PublisherService {
     const commitMessage = `chore(verbete): [canonical] ${frontmatter.title} (${frontmatter.slug}) [skip ci]`;
 
     try {
+      // 0. Limpeza de Locks órfãos e garantia de identidade Git
+      this.cleanGitLocks();
+      await this.ensureGitIdentity();
+
       // Stage dos arquivos canônicos e do front-end
       for (const fp of filePaths) {
         const relativePath = path.relative(process.cwd(), fp);
@@ -151,19 +289,23 @@ export class PublisherService {
 
       console.log(`[Publisher - Git]: Commit criado com sucesso: ${commitHash}`);
 
-      // Push para o repositório remoto caso configurado
+      // Push para o repositório remoto com sincronização defensiva (rebase + autostash)
       let pushed = false;
       try {
         const { stdout: remotes } = await execFileAsync('git', ['remote']);
         if (remotes.trim()) {
-          console.log(`[Publisher - Git]: Enviando push para origin/${this.githubBranch}...`);
           const repo = this.config.githubRepo || process.env.GITHUB_REPO || 'arthuraef/design-grimoar';
           const pushTarget = this.githubToken
             ? `https://x-access-token:${this.githubToken}@github.com/${repo.replace(/^\//, '')}.git`
             : 'origin';
+
+          // Sincronização prévia antes do push para evitar non-fast-forward
+          await this.syncRemoteBeforePush(pushTarget);
+
+          console.log(`[Publisher - Git]: Enviando push para origin/${this.githubBranch}...`);
           await execFileAsync('git', ['push', pushTarget, this.githubBranch]);
           pushed = true;
-          console.log('[Publisher - Git]: Push remoto concluído.');
+          console.log('[Publisher - Git]: Push remoto concluído com sucesso.');
         } else {
           console.log('[Publisher - Git]: Repositório local sem remotes remotos configurados. Push ignorado.');
         }
@@ -208,9 +350,9 @@ export class PublisherService {
           INSERT INTO verbetes (
             id, slug, title, domain, subdomain, status, version, 
             summary, tags, aliases, academic_anchors, file_path, 
-            content_markdown, audit_status, updated_at
+            content_markdown, audit_status, frontmatter, updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
           ON CONFLICT (slug) DO UPDATE SET
             title = EXCLUDED.title,
             domain = EXCLUDED.domain,
@@ -224,6 +366,7 @@ export class PublisherService {
             file_path = EXCLUDED.file_path,
             content_markdown = EXCLUDED.content_markdown,
             audit_status = EXCLUDED.audit_status,
+            frontmatter = EXCLUDED.frontmatter,
             updated_at = NOW()
           RETURNING id;
         `;
@@ -243,6 +386,7 @@ export class PublisherService {
           filePath,
           markdownContent,
           frontmatter.audit.status,
+          JSON.stringify(frontmatter),
         ]);
 
         const verbeteId = verbeteRes.rows[0].id;

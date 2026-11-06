@@ -172,6 +172,64 @@ Formulada por John Sweller em 1988, categoriza a carga mental em intrínseca, es
   assert((ctx as any).publisher !== undefined, 'ctx.publisher deve estar disponível');
   assert((ctx as any).hermesNotifier !== undefined, 'ctx.hermesNotifier deve estar disponível');
 
+  // --------------------------------------------------------------------------
+  // TESTE 4: Blindagem Git (Locks Órfãos e Identidade Autônoma)
+  // --------------------------------------------------------------------------
+  console.log('\n--- TESTE 4: Blindagem Git & Limpeza de Locks Órfãos ---');
+
+  // Simula a existência de um lock órfão
+  const dummyLock = path.resolve('.git/index.lock');
+  fs.writeFileSync(dummyLock, 'dummy lock test');
+  assert(fs.existsSync(dummyLock), 'Lock de teste deve ter sido criado');
+
+  publisher.cleanGitLocks();
+  assert(!fs.existsSync(dummyLock), 'cleanGitLocks deve remover lock órfão com segurança');
+
+  await publisher.ensureGitIdentity();
+  assert(true, 'ensureGitIdentity deve executar sem erros');
+
+  // --------------------------------------------------------------------------
+  // TESTE 5: Cold Start & Bootstrap Vetorial da Taxonomia Existente
+  // --------------------------------------------------------------------------
+  console.log('\n--- TESTE 5: Bootstrap / Backfill Vetorial da Taxonomia ---');
+
+  const indexedCount = await publisher.bootstrapExistingVerbetes('taxonomia');
+  assert(typeof indexedCount === 'number', 'bootstrapExistingVerbetes deve retornar a quantidade de verbetes verificados');
+
+  // --------------------------------------------------------------------------
+  // TESTE 6: Mecanismo de Lock e Exponential Backoff
+  // --------------------------------------------------------------------------
+  console.log('\n--- TESTE 6: Resiliência (ExecutionLock & Backoff) ---');
+
+  const { ExecutionLock } = await import('./utils/lock.js');
+  const { withExponentialBackoff } = await import('./utils/retry.js');
+
+  const testLock = new ExecutionLock('.test-scanner.lock');
+  const acquiredFirst = testLock.acquire();
+  assert(acquiredFirst === true, 'Primeira aquisição do lock deve ter sucesso');
+
+  const acquiredSecond = testLock.acquire();
+  assert(acquiredSecond === true, 'Reaquisição pelo mesmo PID deve ser permitida');
+
+  testLock.release();
+  assert(true, 'Release do lock deve concluir sem falhas');
+
+  let callAttempts = 0;
+  const backoffResult = await withExponentialBackoff(
+    async () => {
+      callAttempts++;
+      if (callAttempts < 2) {
+        throw new Error('503 Service Unavailable transitório');
+      }
+      return 'ok';
+    },
+    { maxRetries: 3, initialDelayMs: 50 },
+    'TesteBackoff'
+  );
+
+  assert(backoffResult === 'ok', 'withExponentialBackoff deve recuperar operação após erro 503');
+  assert(callAttempts === 2, 'withExponentialBackoff deve retentar exatamente a quantidade necessária');
+
   console.log('\n========================================================================');
   console.log(`📊 RESULTADO FINAL: ${passed} passaram, ${failed} falharam.`);
   console.log('========================================================================\n');
