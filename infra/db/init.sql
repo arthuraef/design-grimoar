@@ -36,12 +36,20 @@ ALTER TABLE verbetes ADD COLUMN IF NOT EXISTS frontmatter JSONB DEFAULT '{}'::js
 CREATE TABLE IF NOT EXISTS verbete_embeddings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     verbete_id VARCHAR(128) REFERENCES verbetes(id) ON DELETE CASCADE,
-    section_title VARCHAR(255) NOT NULL,
-    chunk_index INT NOT NULL,
+    section_name VARCHAR(255) DEFAULT '',
+    section_order INT DEFAULT 0,
+    section_title VARCHAR(255) DEFAULT '',
+    chunk_index INT DEFAULT 0,
     content_chunk TEXT NOT NULL,
     embedding vector(1536), -- Embeddings de 1536 dimensões (OpenAI / DeepSeek / Gemini)
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migrações defensivas para verbete_embeddings
+ALTER TABLE verbete_embeddings ADD COLUMN IF NOT EXISTS section_name VARCHAR(255) DEFAULT '';
+ALTER TABLE verbete_embeddings ADD COLUMN IF NOT EXISTS section_order INT DEFAULT 0;
+ALTER TABLE verbete_embeddings ADD COLUMN IF NOT EXISTS section_title VARCHAR(255) DEFAULT '';
+ALTER TABLE verbete_embeddings ADD COLUMN IF NOT EXISTS chunk_index INT DEFAULT 0;
 
 -- Índice Vetorial HNSW para Alta Performance em ARM64
 CREATE INDEX IF NOT EXISTS idx_verbete_embeddings_hnsw 
