@@ -520,33 +520,186 @@ html, body {
   line-height: 1.2;
 }
 
-/* Sidebar Search Trigger Button */
+/* Sidebar Search Trigger Button — Em destaque refinado Notion */
 .notion-sidebar-search-btn {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 7px 10px;
-  margin-bottom: 12px;
-  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  border-radius: 6px;
   background-color: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: 13px;
+  color: var(--text-main);
+  font-size: 13.5px;
   font-family: inherit;
+  font-weight: 500;
   cursor: pointer;
   text-align: left;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
 }
 
 .notion-sidebar-search-btn:hover {
   background-color: var(--bg-hover);
   color: var(--text-main);
-  border-color: var(--border-divider);
+  border-color: var(--accent-link);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.notion-sidebar-search-icon {
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0.85;
 }
 
 .notion-sidebar-search-text {
   flex: 1;
+}
+
+/* ==============================================================================
+   HERO SEARCH BAR (Página Inicial / Principal CTA do Grimoar)
+   ============================================================================== */
+.notion-hero-search-container {
+  margin: 28px 0 36px 0;
+  width: 100%;
+}
+
+.notion-hero-search-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 16px 20px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1), 
+              border-color 0.18s ease,
+              background-color 0.18s ease;
+}
+
+.notion-hero-search-bar:hover,
+.notion-hero-search-bar:focus-visible {
+  outline: none;
+  border-color: var(--accent-link);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.08), 0 2px 5px rgba(0, 0, 0, 0.03);
+  background-color: var(--bg-hover);
+}
+
+[data-theme="dark"] .notion-hero-search-bar {
+  background-color: var(--bg-surface);
+  border-color: var(--border-subtle);
+  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .notion-hero-search-bar:hover,
+[data-theme="dark"] .notion-hero-search-bar:focus-visible {
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
+  background-color: var(--bg-hover);
+}
+
+.notion-hero-search-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.notion-hero-search-icon {
+  font-size: 21px;
+  line-height: 1;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.notion-hero-search-placeholder {
+  font-size: 15.5px;
+  color: var(--text-muted);
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.notion-hero-search-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.notion-hero-kbd {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 4px;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.notion-hero-search-action {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-link);
+  background-color: rgba(11, 110, 153, 0.08);
+  padding: 5px 12px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+[data-theme="dark"] .notion-hero-search-action {
+  background-color: rgba(82, 156, 202, 0.15);
+  color: var(--accent-link);
+}
+
+/* Quick search pills below hero */
+.notion-hero-quick-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+  padding: 0 2px;
+}
+
+.notion-quick-label {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+.notion-quick-pill {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.notion-quick-pill:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+  border-color: var(--border-divider);
 }
 
 /* Header Search Trigger Button */

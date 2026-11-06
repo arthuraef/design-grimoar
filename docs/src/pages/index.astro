@@ -29,6 +29,36 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
   <!-- Notion Page Title -->
   <h1 class="notion-page-title">Design Grimoar</h1>
 
+  <!-- Hero Search (Principal Call-to-Action Visual Notion-like) -->
+  <div class="notion-hero-search-container">
+    <div 
+      class="notion-hero-search-bar" 
+      id="hero-search-trigger" 
+      role="button" 
+      tabindex="0" 
+      aria-label="Pesquisar verbetes e cânones no Grimoar (Cmd + K)"
+    >
+      <div class="notion-hero-search-left">
+        <span class="notion-hero-search-icon">🔍</span>
+        <span class="notion-hero-search-placeholder">Pesquisar verbetes, heurísticas, conceitos e âncoras acadêmicas...</span>
+      </div>
+      <div class="notion-hero-search-right">
+        <kbd class="notion-hero-kbd">⌘K</kbd>
+        <span class="notion-hero-search-action">Buscar</span>
+      </div>
+    </div>
+
+    <!-- Pílulas de Termos Canônicos Rápidos -->
+    <div class="notion-hero-quick-tags">
+      <span class="notion-quick-label">Explorar:</span>
+      <button type="button" class="notion-quick-pill" data-quick-search="Affordance">Affordance</button>
+      <button type="button" class="notion-quick-pill" data-quick-search="Cognitive Load">Cognitive Load</button>
+      <button type="button" class="notion-quick-pill" data-quick-search="Lei de Fitts">Lei de Fitts</button>
+      <button type="button" class="notion-quick-pill" data-quick-search="Design Tokens">Design Tokens</button>
+      <button type="button" class="notion-quick-pill" data-quick-search="Psicologia Cognitiva">Psicologia Cognitiva</button>
+    </div>
+  </div>
+
   <!-- Notion Properties Block -->
   <div class="notion-properties">
     <div class="notion-property-row">

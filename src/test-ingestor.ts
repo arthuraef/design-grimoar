@@ -129,6 +129,37 @@ async function runTestSuite() {
   assert((ctx as any).ingestor !== undefined, 'Serviço ctx.ingestor deve estar registrado e acessível');
   assert((ctx as any).ingestor instanceof IngestorPlugin, 'Instância deve ser do tipo IngestorPlugin');
 
+  // --------------------------------------------------------------------------
+  // TESTE 6: Modo Furtivo & Rate Limiting Conservador (15 a 40 min jitter)
+  // --------------------------------------------------------------------------
+  console.log('\n--- TESTE 6: Modo Furtivo & Jitter Rate Limiting (2 a 3 verbetes/h) ---');
+
+  const ingestorInstance: IngestorPlugin = (ctx as any).ingestor;
+  assert(ingestorInstance.firecrawl.stealthMode === true, 'Modo furtivo deve estar habilitado por padrão');
+  assert(ingestorInstance.firecrawl.minJitterMinutes === 15, 'Jitter mínimo deve ser de 15 minutos');
+  assert(ingestorInstance.firecrawl.maxJitterMinutes === 40, 'Jitter máximo deve ser de 40 minutos');
+
+  // Captura de log para validar formato estrito do terminal
+  let capturedLog = '';
+  const originalLog = console.log;
+  console.log = (...args: any[]) => {
+    capturedLog += args.join(' ') + '\n';
+    originalLog(...args);
+  };
+
+  const calculatedMinutes = await ingestorInstance.applyStealthDelay();
+  console.log = originalLog;
+
+  assert(calculatedMinutes >= 15 && calculatedMinutes <= 40, `Jitter (${calculatedMinutes} min) deve estar entre 15 e 40 minutos`);
+  assert(
+    capturedLog.includes('Modo furtivo ativado: aguardando') && capturedLog.includes('minutos para o próximo verbete'),
+    'Deve emitir o log estrito "Modo furtivo ativado: aguardando X minutos para o próximo verbete"'
+  );
+
+  // Teste de customMinutes
+  const forcedMinutes = await ingestorInstance.applyStealthDelay({ customMinutes: 25 });
+  assert(forcedMinutes === 25, 'Deve permitir minutos customizados mantendo conformidade');
+
   console.log('\n===============================================================');
   console.log(`📊 RESULTADO FINAL: ${passed} passaram, ${failed} falharam.`);
   console.log('===============================================================\n');

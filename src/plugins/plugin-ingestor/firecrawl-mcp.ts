@@ -12,6 +12,15 @@ export interface ScrapedDocument {
   scrapedAt: string;
 }
 
+export interface FirecrawlScraperOptions {
+  apiKey?: string;
+  apiUrl?: string;
+  stealthMode?: boolean;
+  minJitterMinutes?: number;
+  maxJitterMinutes?: number;
+  allowTestFallback?: boolean;
+}
+
 /**
  * Cliente Determinístico Firecrawl (MCP / REST)
  * Cumpre a Regra 1 (Não usar LLM para scraping) e Regra 3 (Least Privilege - Sem GITHUB_TOKEN).
@@ -19,10 +28,20 @@ export interface ScrapedDocument {
 export class FirecrawlScraperClient {
   private apiKey?: string;
   private apiUrl: string;
+  public stealthMode: boolean;
+  public minJitterMinutes: number;
+  public maxJitterMinutes: number;
+  public allowTestFallback: boolean;
 
-  constructor(options?: { apiKey?: string; apiUrl?: string }) {
+  constructor(options?: FirecrawlScraperOptions) {
     this.apiKey = options?.apiKey || process.env.FIRECRAWL_API_KEY;
     this.apiUrl = options?.apiUrl || process.env.FIRECRAWL_API_URL || 'https://api.firecrawl.dev';
+    this.stealthMode = options?.stealthMode ?? (process.env.STEALTH_MODE !== 'false');
+    this.minJitterMinutes = options?.minJitterMinutes ?? parseInt(process.env.STEALTH_MIN_MINUTES || '15', 10);
+    this.maxJitterMinutes = options?.maxJitterMinutes ?? parseInt(process.env.STEALTH_MAX_MINUTES || '40', 10);
+    this.allowTestFallback =
+      options?.allowTestFallback ??
+      (process.env.NODE_ENV === 'test' || process.env.ALLOW_TEST_FALLBACKS === 'true');
   }
 
   /**
@@ -35,6 +54,36 @@ export class FirecrawlScraperClient {
         '⚠️ [Least Privilege Gate]: Isolando ambiente do scraper Firecrawl — GITHUB_TOKEN removido do escopo de rede.'
       );
     }
+  }
+
+  /**
+   * Modo Furtivo com Jitter Aleatório de 15 a 40 minutos (Rate Limit: 2 a 3 verbetes por hora)
+   * Simula comportamento humano e previne bloqueio de WAF / Cloudflare.
+   * Em ambiente de teste (NODE_ENV=test), o delay real é ignorado mas o cálculo e o log são preservados.
+   */
+  async applyStealthDelay(options?: {
+    customMinutes?: number;
+    forceRealDelay?: boolean;
+  }): Promise<number> {
+    const min = this.minJitterMinutes;
+    const max = this.maxJitterMinutes;
+    const minutes =
+      options?.customMinutes ?? Math.floor(Math.random() * (max - min + 1)) + min;
+
+    // Log estrito no terminal conforme especificado
+    console.log(`Modo furtivo ativado: aguardando ${minutes} minutos para o próximo verbete`);
+
+    const isTest =
+      process.env.NODE_ENV === 'test' ||
+      process.env.BYPASS_STEALTH_DELAY === 'true' ||
+      this.allowTestFallback;
+
+    if (!isTest || options?.forceRealDelay) {
+      const delayMs = minutes * 60 * 1000;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    return minutes;
   }
 
   /**
@@ -100,11 +149,15 @@ export class FirecrawlScraperClient {
   }
 
   /**
-   * Consome em lote uma lista de fontes oficiais
+   * Consome em lote uma lista de fontes oficiais aplicando o modo furtivo entre requisições
    */
   async scrapeSources(sources: WebSourceDefinition[]): Promise<ScrapedDocument[]> {
     const results: ScrapedDocument[] = [];
-    for (const source of sources) {
+    for (let i = 0; i < sources.length; i++) {
+      const source = sources[i];
+      if (i > 0 && this.stealthMode) {
+        await this.applyStealthDelay();
+      }
       try {
         console.log(`[Firecrawl MCP]: Raspando fonte canônica "${source.name}" (${source.url})...`);
         const doc = await this.scrape(source.url, source);

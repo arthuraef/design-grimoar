@@ -11,6 +11,10 @@ export interface IngestorConfig {
   firecrawlApiUrl?: string;
   similarityThreshold?: number;
   autoProcessSources?: boolean;
+  stealthMode?: boolean;
+  minJitterMinutes?: number;
+  maxJitterMinutes?: number;
+  allowTestFallback?: boolean;
 }
 
 /**
@@ -21,6 +25,7 @@ export interface IngestorConfig {
  * 2. Transcrição do UXPodcast via VibeVoice ASR (0.5B)
  * 3. Sanitização estrita contra Prompt Injection
  * 4. Busca Semântica via pgvector (limiar >= 0.82 para MERGE vs CREATE)
+ * 5. Modo Furtivo com Jitter de 15 a 40 minutos (Rate Limit: 2 a 3 verbetes/hora)
  */
 export class IngestorPlugin {
   public firecrawl: FirecrawlScraperClient;
@@ -33,14 +38,26 @@ export class IngestorPlugin {
     this.firecrawl = new FirecrawlScraperClient({
       apiKey: config.firecrawlApiKey,
       apiUrl: config.firecrawlApiUrl,
+      stealthMode: config.stealthMode,
+      minJitterMinutes: config.minJitterMinutes,
+      maxJitterMinutes: config.maxJitterMinutes,
+      allowTestFallback: config.allowTestFallback,
     });
     this.transcriber = new VibeVoiceTranscriber();
     this.router = new SemanticRouter({ databaseUrl: config.databaseUrl });
 
     console.log('🔌 [Plugin Ingestor]: Inicializado no DeepSeek Harness.');
     console.log(`   - Limiar de Similaridade de Cosseno: ${this.threshold}`);
+    console.log(`   - Modo Furtivo: ${this.firecrawl.stealthMode ? 'Ativado (15-40 min jitter / 2-3 verbetes/h)' : 'Desativado'}`);
     console.log(`   - 7 Fontes Web Configuradas: ${OFFICIAL_WEB_SOURCES.map((s) => s.id).join(', ')}`);
     console.log(`   - Fonte de Áudio: ${OFFICIAL_AUDIO_SOURCE.name} (VibeVoice ASR 0.5B)`);
+  }
+
+  /**
+   * Aciona o atraso aleatório do modo furtivo (15 a 40 minutos)
+   */
+  async applyStealthDelay(options?: { customMinutes?: number; forceRealDelay?: boolean }): Promise<number> {
+    return this.firecrawl.applyStealthDelay(options);
   }
 
   /**
@@ -96,13 +113,17 @@ export class IngestorPlugin {
   }
 
   /**
-   * Executa a ingestão completa das 7 fontes canônicas
+   * Executa a ingestão completa das 7 fontes canônicas com modo furtivo
    */
   async ingestAllCanonicalWebSources(): Promise<Array<{ document: ScrapedDocument; route: SemanticRoutingPayload }>> {
     console.log(`\n🌐 [Plugin Ingestor]: Executando ingestão em lote das 7 fontes oficiais...`);
     const results = [];
 
-    for (const source of OFFICIAL_WEB_SOURCES) {
+    for (let i = 0; i < OFFICIAL_WEB_SOURCES.length; i++) {
+      const source = OFFICIAL_WEB_SOURCES[i];
+      if (i > 0 && this.firecrawl.stealthMode) {
+        await this.applyStealthDelay();
+      }
       try {
         const item = await this.ingestWeb(source.id);
         results.push(item);

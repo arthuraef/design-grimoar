@@ -25,12 +25,16 @@ export class GrimoarOrchestrator {
   private loopController: VerificationLoopController;
 
   constructor(protected ctx: Context) {
-    // 1. Ingestor: Firecrawl MCP / REST + VibeVoice ASR + pgvector embeddings reais
+    // 1. Ingestor: Firecrawl MCP / REST + VibeVoice ASR + pgvector + Modo Furtivo (Rate Limit 2-3 verbetes/h)
     this.ingestor = new IngestorPlugin(ctx, {
       similarityThreshold: parseFloat(process.env.SIMILARITY_THRESHOLD || '0.82'),
       databaseUrl: process.env.DATABASE_URL,
       firecrawlApiKey: process.env.FIRECRAWL_API_KEY,
       firecrawlApiUrl: process.env.FIRECRAWL_API_URL || 'https://api.firecrawl.dev',
+      stealthMode: process.env.STEALTH_MODE !== 'false',
+      minJitterMinutes: parseInt(process.env.STEALTH_MIN_MINUTES || '15', 10),
+      maxJitterMinutes: parseInt(process.env.STEALTH_MAX_MINUTES || '40', 10),
+      allowTestFallback: process.env.NODE_ENV === 'test' || process.env.ALLOW_TEST_FALLBACKS === 'true',
     });
 
     // 2. Synthesizer (Lexicógrafo - Generator): Leitura dinâmica do .env
@@ -177,6 +181,47 @@ export class GrimoarOrchestrator {
       commitHash: publishResult.commitHash,
     };
   }
+
+  /**
+   * Executa uma fila de fontes ou verbetes em modo furtivo com limite de taxa conservador (2 a 3 verbetes por hora).
+   * Aplica atrasos aleatórios com jitter de 15 a 40 minutos entre cada requisição web/ASR.
+   */
+  async processQueue(
+    sources: Array<string | { urlOrSource: string; isAudio?: boolean }>,
+    options?: { bypassStealth?: boolean }
+  ): Promise<Array<PipelineExecutionResult & { commitHash?: string }>> {
+    console.log(`\n======================================================`);
+    console.log(`🚦 Iniciando Fila de Execução Furtiva (${sources.length} itens)`);
+    console.log(`🛡️ Rate Limit: 2 a 3 verbetes/hora | Jitter: 15 a 40 minutos`);
+    console.log(`======================================================\n`);
+
+    const results: Array<PipelineExecutionResult & { commitHash?: string }> = [];
+
+    for (let i = 0; i < sources.length; i++) {
+      const item = sources[i];
+      const url = typeof item === 'string' ? item : item.urlOrSource;
+      const isAudio = typeof item === 'string' ? item === 'uxpodcast' : Boolean(item.isAudio);
+
+      // Aplica o atraso furtivo para o segundo item em diante
+      if (i > 0 && !options?.bypassStealth && process.env.STEALTH_MODE !== 'false') {
+        await this.ingestor.applyStealthDelay();
+      }
+
+      try {
+        const res = await this.processContentToVerbete(url, isAudio);
+        results.push(res);
+      } catch (err: any) {
+        console.error(`❌ Erro no processamento do item "${url}":`, err.message);
+        results.push({
+          success: false,
+          stage: 1,
+          errors: [err.message],
+        });
+      }
+    }
+
+    return results;
+  }
 }
 
 // Registro de todos os plugins no Cordis
@@ -193,20 +238,36 @@ ctx.plugin((ctx) => {
   // CLI rápida para testes se fornecido argumento via linha de comando
   const target = process.argv[2];
   const isAudioFlag = process.argv.includes('--audio');
-  if (target && (target.startsWith('http://') || target.startsWith('https://') || target === 'nngroup' || target === 'uxpodcast')) {
-    orchestrator
-      .processContentToVerbete(target, isAudioFlag || target === 'uxpodcast')
-      .then((res) => {
-        if (res.success) {
-          console.log(`\n🎉 Pipeline concluído com sucesso! Commit: ${res.commitHash} | Arquivo: ${res.verbetePath}`);
-        } else {
-          console.error(`\n❌ Falha no pipeline na etapa ${res.stage}:`, res.errors);
+  const isQueueFlag = process.argv.includes('--queue');
+
+  if (target) {
+    if (isQueueFlag || target.includes(',')) {
+      const targets = target.split(',').map((s) => s.trim()).filter(Boolean);
+      orchestrator
+        .processQueue(targets)
+        .then((results) => {
+          const successes = results.filter((r) => r.success).length;
+          console.log(`\n🏁 Fila finalizada: ${successes}/${results.length} verbetes processados com sucesso.`);
+        })
+        .catch((err) => {
+          console.error('\n❌ Erro fatal na fila:', err);
           process.exit(1);
-        }
-      })
-      .catch((err) => {
-        console.error('\n❌ Erro fatal no pipeline:', err);
-        process.exit(1);
-      });
+        });
+    } else if (target.startsWith('http://') || target.startsWith('https://') || target === 'nngroup' || target === 'uxpodcast') {
+      orchestrator
+        .processContentToVerbete(target, isAudioFlag || target === 'uxpodcast')
+        .then((res) => {
+          if (res.success) {
+            console.log(`\n🎉 Pipeline concluído com sucesso! Commit: ${res.commitHash} | Arquivo: ${res.verbetePath}`);
+          } else {
+            console.error(`\n❌ Falha no pipeline na etapa ${res.stage}:`, res.errors);
+            process.exit(1);
+          }
+        })
+        .catch((err) => {
+          console.error('\n❌ Erro fatal no pipeline:', err);
+          process.exit(1);
+        });
+    }
   }
 });

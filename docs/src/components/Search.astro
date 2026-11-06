@@ -169,15 +169,19 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
     });
 
     // Abertura e Fechamento do Modal
-    async function openSearch() {
+    async function openSearch(initialQuery) {
       if (!backdrop) return;
       backdrop.classList.add('open');
       backdrop.setAttribute('aria-hidden', 'false');
-      input?.focus();
-      await loadPagefind();
-      if (!input.value.trim()) {
-        executeSearch('');
+      if (typeof initialQuery === 'string' && input) {
+        input.value = initialQuery;
       }
+      input?.focus();
+      if (input && input.value) {
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+      await loadPagefind();
+      executeSearch(input ? input.value.trim() : '');
     }
 
     function closeSearch() {
@@ -317,7 +321,15 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
 
     // Triggers externos
     document.addEventListener('click', (e) => {
-      const target = e.target.closest('#sidebar-search-trigger, #header-search-trigger, [data-open-search]');
+      const quickTarget = e.target.closest('[data-quick-search]');
+      if (quickTarget) {
+        e.preventDefault();
+        const term = quickTarget.getAttribute('data-quick-search') || '';
+        openSearch(term);
+        return;
+      }
+
+      const target = e.target.closest('#sidebar-search-trigger, #header-search-trigger, #hero-search-trigger, [data-open-search]');
       if (target) {
         e.preventDefault();
         openSearch();
