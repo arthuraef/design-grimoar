@@ -8,6 +8,8 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "validate:schema": "tsx src/schema.ts",
+    "db:init": "tsx scripts/init-db.ts",
+    "curator:batch": "tsx src/index.ts --batch",
     "build:docs": "npm --prefix docs run build",
     "dev:docs": "npm --prefix docs run dev",
     "test": "NODE_ENV=test tsx src/test-schema.ts && NODE_ENV=test tsx src/test-ingestor.ts && NODE_ENV=test tsx src/test-verification-loop.ts && NODE_ENV=test tsx src/test-publisher-notifier.ts",

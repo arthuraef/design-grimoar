@@ -1,0 +1,96 @@
+name: Autonomous Design Grimoar Curator
+
+on:
+  schedule:
+    # Cadência ética a cada 40 minutos (1 a 2 verbetes por rodada, prevenindo WAF/rate limit)
+    - cron: '*/40 * * * *'
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: 'Quantidade de verbetes para curar neste lote (1 ou 2)'
+        required: false
+        default: '1'
+      skip_initial_jitter:
+        description: 'Pular atraso inicial randômico de 1-3 minutos (apenas sob demanda)'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autonomous-curator
+  cancel-in-progress: false
+
+jobs:
+  curator:
+    name: Curadoria & Publicação Autônoma
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      pgvector:
+        image: pgvector/pgvector:pg16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: design_grimoar
+          POSTGRES_USER: grimoar
+          POSTGRES_PASSWORD: grimoar_secure_pass
+        options: >-
+          --health-cmd "pg_isready -U grimoar -d design_grimoar"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar Dependências
+        run: npm ci
+
+      - name: Inicializar Schema no pgvector
+        env:
+          DATABASE_URL: postgresql://grimoar:grimoar_secure_pass@localhost:5432/design_grimoar
+        run: npm run db:init
+
+      - name: Executar Autonomous Curator (Batch)
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgresql://grimoar:grimoar_secure_pass@localhost:5432/design_grimoar
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          FIRECRAWL_API_URL: ${{ secrets.FIRECRAWL_API_URL || 'https://api.firecrawl.dev' }}
+          EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY }}
+          EMBEDDING_BASE_URL: ${{ secrets.EMBEDDING_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai' }}
+          EMBEDDING_MODEL: ${{ secrets.EMBEDDING_MODEL || 'gemini-embedding-001' }}
+          EMBEDDING_DIMENSIONS: '1536'
+          SIMILARITY_THRESHOLD: '0.82'
+          LEXICOGRAPHER_API_KEY: ${{ secrets.LEXICOGRAPHER_API_KEY }}
+          LEXICOGRAPHER_BASE_URL: ${{ secrets.LEXICOGRAPHER_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai' }}
+          LEXICOGRAPHER_MODEL: ${{ secrets.LEXICOGRAPHER_MODEL || 'gemini-2.5-flash' }}
+          LEXICOGRAPHER_TEMPERATURE: '0.2'
+          ACADEMIC_AUDITOR_API_KEY: ${{ secrets.ACADEMIC_AUDITOR_API_KEY }}
+          ACADEMIC_AUDITOR_BASE_URL: ${{ secrets.ACADEMIC_AUDITOR_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai' }}
+          ACADEMIC_AUDITOR_MODEL: ${{ secrets.ACADEMIC_AUDITOR_MODEL || 'gemini-2.5-pro' }}
+          ACADEMIC_AUDITOR_TEMPERATURE: '0.1'
+          VERIFICATION_LOOP_MAX_ATTEMPTS: '3'
+          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: arthuraef/design-grimoar
+          GITHUB_BRANCH: main
+          STATIC_SITE_CONTENT_DIR: ./docs/src/content/docs
+          NOTIFICATIONS_WEBHOOK_URL: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
+          STEALTH_MODE: 'true'
+          BATCH_SIZE: ${{ inputs.batch_size || '1' }}
+          INITIAL_JITTER: ${{ inputs.skip_initial_jitter && 'false' || 'true' }}
+        run: npm run curator:batch

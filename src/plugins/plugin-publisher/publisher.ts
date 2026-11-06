@@ -225,10 +225,14 @@ export class PublisherService {
     // 2. Gravação Direta na Pasta de Conteúdo do Front-end Estático (Notion-like)
     const { staticSiteSynced, staticSitePath } = this.syncWithStaticSite(frontmatter, markdownContent);
 
-    // 3. Commit e Push Atômico no Git (ambos os caminhos sincronizados)
+    // 3. Commit e Push Atômico no Git (ambos os caminhos sincronizados e rastreamento de URLs)
     const filesToCommit = [filePath];
     if (staticSitePath && fs.existsSync(staticSitePath)) {
       filesToCommit.push(staticSitePath);
+    }
+    const processedUrlsFile = path.resolve('taxonomia/.processed-urls.json');
+    if (fs.existsSync(processedUrlsFile)) {
+      filesToCommit.push(processedUrlsFile);
     }
     const { commitHash, commitMessage, pushed } = await this.commitAndPush(filesToCommit, frontmatter);
 
@@ -267,7 +271,7 @@ export class PublisherService {
     filePaths: string[],
     frontmatter: VerbeteFrontmatter
   ): Promise<{ commitHash: string; commitMessage: string; pushed: boolean }> {
-    const commitMessage = `chore(verbete): [canonical] ${frontmatter.title} (${frontmatter.slug}) [skip ci]`;
+    const commitMessage = `chore(verbete): [canonical] ${frontmatter.title} (${frontmatter.slug})`;
 
     try {
       // 0. Limpeza de Locks órfãos e garantia de identidade Git

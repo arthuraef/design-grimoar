@@ -9,6 +9,7 @@ import { VerificationLoopController } from './plugins/verification-loop.js';
 import { PipelineExecutionResult } from './types/index.js';
 import { ExecutionLock } from './utils/lock.js';
 import { withExponentialBackoff } from './utils/retry.js';
+import { ProcessedUrlsTracker } from './utils/url-tracker.js';
 
 dotenv.config();
 
@@ -290,6 +291,94 @@ export class GrimoarOrchestrator {
       await new Promise((resolve) => setTimeout(resolve, restMinutes * 60 * 1000));
     }
   }
+
+  /**
+   * Executa uma rodada em lote para o GitHub Actions Autonomous Curator.
+   * - Faz o bootstrap dos verbetes existentes da taxonomia no pgvector (Cold Start)
+   * - Rastreia e avança de forma inédita pelas 8 fontes canônicas
+   * - Aplica atraso randômico inicial (1 a 3 min) para simular navegação humana
+   * - Limite estrito de 1 a 2 verbetes por lote para estabilidade e respeito a timeouts
+   */
+  async runBatchCurator(options?: { maxVerbetes?: number; initialJitter?: boolean }): Promise<void> {
+    const maxVerbetes = options?.maxVerbetes ?? parseInt(process.env.BATCH_SIZE || '1', 10);
+    const initialJitter = options?.initialJitter ?? (process.env.INITIAL_JITTER !== 'false');
+
+    if (!this.lock.acquire()) {
+      console.warn('⚠️ [Curator Batch]: Instância concorrente já ativa. Encerrando execução.');
+      return;
+    }
+
+    const cleanup = () => {
+      this.lock.release();
+    };
+    process.once('SIGINT', () => { cleanup(); process.exit(0); });
+    process.once('SIGTERM', () => { cleanup(); process.exit(0); });
+    process.once('exit', () => { cleanup(); });
+
+    console.log(`\n======================================================`);
+    console.log(`🤖 [Autonomous Curator]: Rodada em Lote (Teto: ${maxVerbetes} verbete(s))`);
+    console.log(`======================================================\n`);
+
+    // 1. Cold Start: Bootstrap dos verbetes existentes da taxonomia para o pgvector
+    try {
+      await this.publisher.bootstrapExistingVerbetes('taxonomia');
+    } catch (bootErr: any) {
+      console.warn(`[Cold Start]: Aviso durante bootstrap vetorial: ${bootErr.message}`);
+    }
+
+    // 2. Rastreador de URLs processadas (memória persistente no Git)
+    const tracker = new ProcessedUrlsTracker();
+    console.log(`[UrlTracker]: ${tracker.getProcessedCount()} URLs previamente processadas no histórico.`);
+
+    // 3. Atraso randômico inicial de 1 a 3 minutos para simular navegação humana (Anti-WAF)
+    if (initialJitter && process.env.NODE_ENV !== 'test' && process.env.BYPASS_STEALTH_DELAY !== 'true') {
+      const minSec = 60;
+      const maxSec = 180;
+      const delaySec = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
+      console.log(`⏳ [Curator Batch]: Aguardando jitter inicial de ${delaySec}s (${(delaySec / 60).toFixed(1)} min)...`);
+      await new Promise((resolve) => setTimeout(resolve, delaySec * 1000));
+    }
+
+    // 4. Selecionar próximos candidatos inéditos
+    const candidates = tracker.getNextUnprocessedBatch(maxVerbetes);
+    if (candidates.length === 0) {
+      console.log('🎉 [Curator Batch]: Todas as URLs da fila canônica já foram processadas!');
+      cleanup();
+      return;
+    }
+
+    console.log(`📋 [Curator Batch]: Selecionados ${candidates.length} candidato(s) inédito(s):`);
+    candidates.forEach((c, idx) => console.log(`   ${idx + 1}. [${c.sourceId}] ${c.conceptName} (${c.url})`));
+
+    // 5. Processamento dos candidatos no pipeline de 5 etapas
+    for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i];
+      if (i > 0 && process.env.STEALTH_MODE !== 'false') {
+        await this.ingestor.applyStealthDelay();
+      }
+
+      console.log(`\n▶️ Processando candidato ${i + 1}/${candidates.length}: "${candidate.conceptName}"...`);
+      try {
+        const result = await this.processContentToVerbete(candidate.url, Boolean(candidate.isAudio));
+        if (result.success) {
+          tracker.markAsProcessed(
+            candidate.url,
+            result.frontmatter?.slug,
+            result.frontmatter?.title,
+            candidate.sourceId
+          );
+          console.log(`✅ [Curator Batch]: Verbete "${candidate.conceptName}" processado e publicado com sucesso!`);
+        } else {
+          console.error(`❌ [Curator Batch]: Falha ao processar "${candidate.conceptName}":`, result.errors);
+        }
+      } catch (err: any) {
+        console.error(`❌ [Curator Batch]: Erro fatal ao processar "${candidate.conceptName}":`, err.message);
+      }
+    }
+
+    cleanup();
+    console.log('\n🏁 [Autonomous Curator]: Rodada em lote finalizada com sucesso.');
+  }
 }
 
 // Registro de todos os plugins no Cordis
@@ -303,12 +392,17 @@ ctx.plugin((ctx) => {
   const orchestrator = new GrimoarOrchestrator(ctx);
   console.log('⚡ [DeepSeek Harness / Cordis]: Orquestrador Design Grimoar 100% operacional.');
 
-  // CLI rápida para testes se fornecido argumento via linha de comando
+  const isBatchFlag = process.argv.includes('--batch') || process.env.CURATOR_BATCH === 'true';
   const target = process.argv[2];
   const isAudioFlag = process.argv.includes('--audio');
   const isQueueFlag = process.argv.includes('--queue');
 
-  if (target) {
+  if (isBatchFlag) {
+    orchestrator.runBatchCurator().catch((err) => {
+      console.error('❌ Erro no curator batch:', err);
+      process.exit(1);
+    });
+  } else if (target) {
     if (isQueueFlag || target.includes(',')) {
       const targets = target.split(',').map((s) => s.trim()).filter(Boolean);
       orchestrator
