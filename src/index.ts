@@ -300,7 +300,7 @@ export class GrimoarOrchestrator {
    * - Limite estrito de 1 a 2 verbetes por lote para estabilidade e respeito a timeouts
    */
   async runBatchCurator(options?: { maxVerbetes?: number; initialJitter?: boolean }): Promise<void> {
-    const maxVerbetes = options?.maxVerbetes ?? parseInt(process.env.BATCH_SIZE || '1', 10);
+    const maxVerbetes = Math.max(1, options?.maxVerbetes ?? parseInt(process.env.BATCH_SIZE || '1', 10));
     const initialJitter = options?.initialJitter ?? (process.env.INITIAL_JITTER !== 'false');
 
     if (!this.lock.acquire()) {

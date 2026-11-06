@@ -2,12 +2,12 @@ name: Autonomous Design Grimoar Curator
 
 on:
   schedule:
-    # Cadência ética a cada 40 minutos (1 a 2 verbetes por rodada, prevenindo WAF/rate limit)
-    - cron: '*/40 * * * *'
+    # Cadência de curadoria a cada 20 minutos (3 execuções por hora, meta de pelo menos 3 verbetes/h)
+    - cron: '*/20 * * * *'
   workflow_dispatch:
     inputs:
       batch_size:
-        description: 'Quantidade de verbetes para curar neste lote (1 ou 2)'
+        description: 'Quantidade de verbetes para curar neste lote (padrão: 1)'
         required: false
         default: '1'
       skip_initial_jitter:
