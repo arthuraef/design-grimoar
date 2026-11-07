@@ -1,7 +1,10 @@
 {
   "processedUrls": [
     "https://example.com/sweller",
-    "https://mitpress.mit.edu/books/design-everyday-things"
+    "https://mitpress.mit.edu/books/design-everyday-things",
+    "https://www.routledge.com/The-Ecological-Approach-to-Visual-Perception/Gibson/p/book/9781848725782",
+    "https://lawsofux.com/jakobs-law/",
+    "https://www.nngroup.com/videos/jakobs-law-internet-ux/"
   ],
   "history": [
     {
@@ -17,6 +20,27 @@
       "title": "Affordance",
       "sourceId": "existing-file",
       "processedAt": "2026-11-06T16:56:46.478Z"
+    },
+    {
+      "url": "https://www.routledge.com/The-Ecological-Approach-to-Visual-Perception/Gibson/p/book/9781848725782",
+      "slug": "affordance",
+      "title": "Affordance",
+      "sourceId": "existing-file",
+      "processedAt": "2026-11-06T16:56:46.478Z"
+    },
+    {
+      "url": "https://lawsofux.com/jakobs-law/",
+      "slug": "jakobs-law",
+      "title": "Jakob's Law",
+      "sourceId": "existing-file",
+      "processedAt": "2026-11-06T00:00:00Z"
+    },
+    {
+      "url": "https://www.nngroup.com/videos/jakobs-law-internet-ux/",
+      "slug": "jakobs-law",
+      "title": "Jakob's Law",
+      "sourceId": "existing-file",
+      "processedAt": "2026-11-06T00:00:00Z"
     }
   ]
 }
