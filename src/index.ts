@@ -331,12 +331,16 @@ export class GrimoarOrchestrator {
     console.log(`[UrlTracker]: ${tracker.getProcessedCount()} URLs previamente processadas no histórico.`);
 
     // 3. Atraso randômico inicial de 1 a 3 minutos para simular navegação humana (Anti-WAF)
-    if (initialJitter && process.env.NODE_ENV !== 'test' && process.env.BYPASS_STEALTH_DELAY !== 'true') {
+    // No ambiente de nuvem do GitHub Actions (CI=true), desativa atrasos para processamento imediato
+    const isCI = process.env.CI === 'true';
+    if (initialJitter && !isCI && process.env.NODE_ENV !== 'test' && process.env.BYPASS_STEALTH_DELAY !== 'true') {
       const minSec = 60;
       const maxSec = 180;
       const delaySec = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
       console.log(`⏳ [Curator Batch]: Aguardando jitter inicial de ${delaySec}s (${(delaySec / 60).toFixed(1)} min)...`);
       await new Promise((resolve) => setTimeout(resolve, delaySec * 1000));
+    } else if (isCI) {
+      console.log('⚡ [Curator Batch - CI]: Ambiente de nuvem (CI=true) detectado. Jitter inicial desativado para processamento imediato.');
     }
 
     // 4. Selecionar próximos candidatos inéditos

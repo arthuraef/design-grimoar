@@ -76,11 +76,14 @@ export class FirecrawlScraperClient {
     const isTest =
       process.env.NODE_ENV === 'test' ||
       process.env.BYPASS_STEALTH_DELAY === 'true' ||
+      process.env.CI === 'true' ||
       this.allowTestFallback;
 
     if (!isTest || options?.forceRealDelay) {
       const delayMs = minutes * 60 * 1000;
       await new Promise((resolve) => setTimeout(resolve, delayMs));
+    } else if (process.env.CI === 'true') {
+      console.log(`⚡ [Modo Furtivo - CI]: Ambiente de nuvem (CI=true) detectado. Atraso longo de ${minutes} min suprimido para execução imediata.`);
     }
 
     return minutes;
