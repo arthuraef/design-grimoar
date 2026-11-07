@@ -89,37 +89,50 @@ export class AcademicValidatorService {
       console.log(`[Auditor Acadêmico]: Enviando requisição real para ${endpoint} (${this.model})...`);
 
       try {
-        return await withExponentialBackoff(
-          async () => {
-            const response = await fetch(endpoint, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${this.apiKey}`,
-              },
-              body: JSON.stringify({
-                model: this.model,
-                response_format: { type: 'json_object' },
-                messages: [
-                  { role: 'system', content: this.systemPrompt },
-                  { role: 'user', content: userMessage },
-                ],
-                temperature: this.temperature,
-              }),
-            });
+        const executeCall = async (modelName: string) => {
+          return await withExponentialBackoff(
+            async () => {
+              const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${this.apiKey}`,
+                },
+                body: JSON.stringify({
+                  model: modelName,
+                  response_format: { type: 'json_object' },
+                  messages: [
+                    { role: 'system', content: this.systemPrompt },
+                    { role: 'user', content: userMessage },
+                  ],
+                  temperature: this.temperature,
+                }),
+              });
 
-            if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(`[Auditor Acadêmico API Error HTTP ${response.status}]: ${errorText}`);
-            }
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`[Auditor Acadêmico API Error HTTP ${response.status}]: ${errorText}`);
+              }
 
-            const data: any = await response.json();
-            const rawJson = data.choices?.[0]?.message?.content || '{}';
-            return this.parseAuditResponse(rawJson, draftMarkdown);
-          },
-          { maxRetries: 3, initialDelayMs: 2000 },
-          `Auditor Acadêmico (${this.model})`
-        );
+              const data: any = await response.json();
+              const rawJson = data.choices?.[0]?.message?.content || '{}';
+              return this.parseAuditResponse(rawJson, draftMarkdown);
+            },
+            { maxRetries: 3, initialDelayMs: 2000 },
+            `Auditor Acadêmico (${modelName})`
+          );
+        };
+
+        try {
+          return await executeCall(this.model);
+        } catch (primaryErr: any) {
+          const fallbackModel = 'gemini-3.5-flash-lite';
+          if (this.model !== fallbackModel) {
+            console.warn(`⚠️ [Auditor Acadêmico]: Modelo primário (${this.model}) indisponível ou com cota excedida (${primaryErr.message}). Tentando fallback automático para ${fallbackModel}...`);
+            return await executeCall(fallbackModel);
+          }
+          throw primaryErr;
+        }
       } catch (err: any) {
         if (!this.allowFallback) {
           throw err;

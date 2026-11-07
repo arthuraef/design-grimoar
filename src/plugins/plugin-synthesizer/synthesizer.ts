@@ -142,41 +142,52 @@ export class SynthesizerService {
       console.log(`[Lexicógrafo]: Enviando requisição real para ${endpoint} (${this.model})...`);
 
       try {
-        const content = await withExponentialBackoff(
-          async () => {
-            const response = await fetch(endpoint, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${this.apiKey}`,
-              },
-              body: JSON.stringify({
-                model: this.model,
-                messages: [
-                  { role: 'system', content: this.systemPrompt },
-                  { role: 'user', content: userMessage },
-                ],
-                temperature: this.temperature,
-              }),
-            });
+        const executeCall = async (modelName: string) => {
+          return await withExponentialBackoff(
+            async () => {
+              const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${this.apiKey}`,
+                },
+                body: JSON.stringify({
+                  model: modelName,
+                  messages: [
+                    { role: 'system', content: this.systemPrompt },
+                    { role: 'user', content: userMessage },
+                  ],
+                  temperature: this.temperature,
+                }),
+              });
 
-            if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(`[Lexicógrafo API Error HTTP ${response.status}]: ${errorText}`);
-            }
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`[Lexicógrafo API Error HTTP ${response.status}]: ${errorText}`);
+              }
 
-            const data: any = await response.json();
-            const text = data.choices?.[0]?.message?.content;
-            if (!text) {
-              throw new Error('[Lexicógrafo]: API retornou resposta vazia.');
-            }
-            return text.trim();
-          },
-          { maxRetries: 3, initialDelayMs: 2000 },
-          `Lexicógrafo (${this.model})`
-        );
+              const data: any = await response.json();
+              const text = data.choices?.[0]?.message?.content;
+              if (!text) {
+                throw new Error('[Lexicógrafo]: API retornou resposta vazia.');
+              }
+              return text.trim();
+            },
+            { maxRetries: 3, initialDelayMs: 2000 },
+            `Lexicógrafo (${modelName})`
+          );
+        };
 
-        return content;
+        try {
+          return await executeCall(this.model);
+        } catch (primaryErr: any) {
+          const fallbackModel = 'gemini-3.5-flash-lite';
+          if (this.model !== fallbackModel) {
+            console.warn(`⚠️ [Lexicógrafo]: Modelo primário (${this.model}) indisponível ou com cota excedida (${primaryErr.message}). Tentando fallback automático para ${fallbackModel}...`);
+            return await executeCall(fallbackModel);
+          }
+          throw primaryErr;
+        }
       } catch (err: any) {
         if (!this.allowFallback) {
           throw err;
