@@ -142,21 +142,49 @@ export class AcademicValidatorService {
   }
 
   /**
-   * Parseia o retorno JSON do modelo
+   * Parseia o retorno JSON do modelo com sanitização de escapes inválidos e recuperação tolerante a falhas
    */
   private parseAuditResponse(rawJson: string, fallbackDraft: string): AcademicAuditResult {
-    try {
-      const parsed = JSON.parse(rawJson);
-      return {
-        status: parsed.status === 'APPROVED' ? 'APPROVED' : 'REJECTED',
-        academic_anchor_added: Array.isArray(parsed.academic_anchor_added) ? parsed.academic_anchor_added : [],
-        claims_audited: Array.isArray(parsed.claims_audited) ? parsed.claims_audited : [],
-        audited_markdown: parsed.audited_markdown || fallbackDraft,
-        critique: parsed.critique || parsed.reason,
-      };
-    } catch (err: any) {
-      throw new Error(`Falha ao decodificar JSON do Auditor: ${err.message}. Retorno bruto: ${rawJson}`);
+    let cleaned = rawJson.trim();
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
     }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (firstErr) {
+      // Tentativa 1 de recuperação: escapar sequências inválidas de escape (\* -> \\*, \[ -> \\[, etc.)
+      try {
+        const fixedEscapes = cleaned.replace(/\\([^"\\\/bfnrtu]|u(?!([0-9a-fA-F]{4})))/g, '\\\\$1');
+        parsed = JSON.parse(fixedEscapes);
+      } catch (secondErr) {
+        // Tentativa 2 de recuperação: extrair campos essenciais via regex se o JSON estiver com escapes corrompidos
+        const statusMatch = cleaned.match(/"status"\s*:\s*"(APPROVED|REJECTED)"/i);
+        const critiqueMatch = cleaned.match(/"critique"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/i);
+
+        if (statusMatch) {
+          console.warn(`[Auditor Acadêmico]: JSON com escapes corrompidos recuperado via regex. Status: ${statusMatch[1]}`);
+          return {
+            status: statusMatch[1].toUpperCase() === 'APPROVED' ? 'APPROVED' : 'REJECTED',
+            academic_anchor_added: [],
+            claims_audited: [],
+            audited_markdown: fallbackDraft,
+            critique: critiqueMatch ? critiqueMatch[1].replace(/\\"/g, '"') : undefined,
+          };
+        }
+
+        throw new Error(`Falha ao decodificar JSON do Auditor: ${(firstErr as Error).message}. Retorno bruto: ${rawJson}`);
+      }
+    }
+
+    return {
+      status: parsed.status === 'APPROVED' ? 'APPROVED' : 'REJECTED',
+      academic_anchor_added: Array.isArray(parsed.academic_anchor_added) ? parsed.academic_anchor_added : [],
+      claims_audited: Array.isArray(parsed.claims_audited) ? parsed.claims_audited : [],
+      audited_markdown: parsed.audited_markdown || fallbackDraft,
+      critique: parsed.critique || parsed.reason,
+    };
   }
 
   /**

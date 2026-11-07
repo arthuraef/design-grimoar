@@ -59,15 +59,27 @@ export async function runAcademicAuditor(
   const result: any = await response.json();
   const rawJson = result.choices?.[0]?.message?.content || '{}';
 
-  try {
-    const parsed = JSON.parse(rawJson);
-    return {
-      status: parsed.status === 'APPROVED' ? 'APPROVED' : 'REJECTED',
-      academic_anchor_added: Array.isArray(parsed.academic_anchor_added) ? parsed.academic_anchor_added : [],
-      audited_markdown: parsed.audited_markdown || draftMarkdown,
-      critique: parsed.critique,
-    };
-  } catch (err: any) {
-    throw new Error(`Falha ao parsear retorno JSON do Auditor: ${err.message}. Retorno bruto: ${rawJson}`);
+  let parsed: any;
+  let cleaned = rawJson.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   }
+
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (firstErr) {
+    try {
+      const fixedEscapes = cleaned.replace(/\\([^"\\\/bfnrtu]|u(?!([0-9a-fA-F]{4})))/g, '\\\\$1');
+      parsed = JSON.parse(fixedEscapes);
+    } catch (secondErr) {
+      throw new Error(`Falha ao parsear retorno JSON do Auditor: ${(firstErr as Error).message}. Retorno bruto: ${rawJson}`);
+    }
+  }
+
+  return {
+    status: parsed.status === 'APPROVED' ? 'APPROVED' : 'REJECTED',
+    academic_anchor_added: Array.isArray(parsed.academic_anchor_added) ? parsed.academic_anchor_added : [],
+    audited_markdown: parsed.audited_markdown || draftMarkdown,
+    critique: parsed.critique,
+  };
 }

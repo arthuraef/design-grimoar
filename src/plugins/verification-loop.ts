@@ -69,7 +69,34 @@ export class VerificationLoopController {
       const draftMarkdown = await this.synthesizer.synthesize(input, feedback);
 
       // 2. VERIFICAÇÃO 1: Auditoria Científica e Acadêmica (Agente Verificador Independente)
-      const auditResult = await this.validator.validate(draftMarkdown);
+      let auditResult: AcademicAuditResult;
+      try {
+        auditResult = await this.validator.validate(draftMarkdown);
+      } catch (err: any) {
+        const failureReason = `Erro ao executar auditoria: ${err.message}`;
+        console.warn(`❌ [Tentativa ${attempt}]: ${failureReason}`);
+
+        history.push({
+          attempt,
+          draftMarkdown,
+          passed: false,
+          failureReason,
+        });
+
+        if (attempt < this.maxAttempts) {
+          console.log(`⚠️ [Loop]: Reenviando automaticamente para o Lexicógrafo com feedback técnico...`);
+          feedback = {
+            attempt: attempt + 1,
+            auditorCritique: `O Auditor encontrou um erro técnico ao processar o rascunho anterior: ${err.message}. Reformule o documento de forma limpa com markdown padronizado.`,
+            previousDraft: draftMarkdown,
+          };
+          continue;
+        } else {
+          throw new Error(
+            `[Loop de Verificação Esgotado]: Falha técnica no Auditor Acadêmico após ${this.maxAttempts} tentativas.\nÚltimo erro: ${err.message}`
+          );
+        }
+      }
 
       if (auditResult.status !== 'APPROVED') {
         const failureReason = `Reprovado pelo Auditor Acadêmico: ${auditResult.critique || 'Falta de ancoragem teórica ou escopo inválido'}`;
