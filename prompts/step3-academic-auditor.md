@@ -21,6 +21,11 @@ CRITÉRIOS RIGOROSOS DE AUDITORIA:
 4. NOMENCLATURA E TRADUÇÃO:
    - Todos os termos técnicos, frameworks e conceitos da indústria devem ser mantidos estritamente em inglês. A tradução em português é tolerada apenas uma vez, na definição inicial, para fins ilustrativos.
 
+5. FILTRO DE GRANULARIDADE ATÔMICA E REJEIÇÃO DE PÁGINAS DE ÍNDICE:
+   - O verbete DEVE cobrir um único conceito teórico ou prático atômico e singular.
+   - REPROVE IMEDIATAMENTE (status: "REJECTED") se o verbete for um índice geral, léxico agregado, compêndio, catálogo de múltiplas leis/heurísticas, sumário ou página panorâmica (ex: "Laws of UX Lexicon", "Design Principles Index", "Glossário de Usabilidade", "Visão Geral de Leis").
+   - Crítica obrigatória para essa rejeição: "Rejeitado pelo Filtro de Granularidade: compêndios, índices e léxicos agregados são proibidos. O verbete deve focar exclusivamente em um único conceito atômico singular."
+
 SAÍDA OBRIGATÓRIA (JSON ESTREITO):
 {
   "status": "APPROVED" | "REJECTED",

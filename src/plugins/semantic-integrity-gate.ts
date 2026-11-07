@@ -285,6 +285,43 @@ export class SemanticIntegrityGate {
     checks['typedRelationsValid'] = typedRelationsValid;
 
     // ------------------------------------------------------------------------
+    // CHECK 7: Granularidade Atômica (Bloqueio de Páginas de Índice / Compêndio)
+    // ------------------------------------------------------------------------
+    let atomicGranularity = true;
+    const indexPatterns = [
+      /(\b|_|-)(lexicon|index|glossary|glossario|compendium|compendio|catalog|catalogo|overview|panoramica|sumario|resumo-geral)(\b|_|-)/i,
+      /^laws-of-ux-lexicon$/i,
+      /^design-heuristics-index$/i,
+      /^indice-/i,
+      /^glossario-/i,
+    ];
+
+    const isIndexTitleOrSlug = indexPatterns.some(
+      (pat) => pat.test(slugLower) || pat.test(titleLower)
+    );
+
+    const isIndexDescription = 
+      /(\bcompêndio estruturado\b|\bléxico de\b|\blistagem de leis\b|\bcatalogo de conceitos\b|\bíndice geral\b)/i.test(frontmatter.summary) ||
+      /(\bcompêndio de\b|\bconjunto de leis\b|\blista de princípios\b|\bguia panorâmico\b)/i.test(section1Text);
+
+    if (isIndexTitleOrSlug || isIndexDescription) {
+      atomicGranularity = false;
+      criticalInconsistencies.push(
+        `[Filtro de Granularidade]: O verbete "${frontmatter.title}" (${frontmatter.slug}) foi identificado como índice, compêndio ou léxico geral agregado. O Design Grimoar exige exclusivamente conceitos atômicos singulares.`
+      );
+    }
+
+    details.push({
+      checkName: 'atomic_granularity',
+      passed: atomicGranularity,
+      message: atomicGranularity
+        ? 'Granularidade atômica confirmada (conceito singular).'
+        : 'Violação de granularidade: índices, compêndios e compilações gerais são proibidos.',
+      severity: atomicGranularity ? 'INFO' : 'CRITICAL',
+    });
+    checks['atomicGranularity'] = atomicGranularity;
+
+    // ------------------------------------------------------------------------
     // CÁLCULO DO SCORE DE INTEGRIDADE (0 a 100)
     // ------------------------------------------------------------------------
     const totalChecks = Object.keys(checks).length;

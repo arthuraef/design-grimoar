@@ -373,10 +373,13 @@ export class GrimoarOrchestrator {
           );
           console.log(`✅ [Curator Batch]: Verbete "${candidate.conceptName}" processado e publicado com sucesso!`);
         } else {
+          const errDetail = result.errors?.join('; ') || 'Erro não especificado';
           console.error(`❌ [Curator Batch]: Falha ao processar "${candidate.conceptName}":`, result.errors);
+          tracker.dlq.recordFailure(candidate.url, candidate.sourceId, errDetail);
         }
       } catch (err: any) {
         console.error(`❌ [Curator Batch]: Erro fatal ao processar "${candidate.conceptName}":`, err.message);
+        tracker.dlq.recordFailure(candidate.url, candidate.sourceId, err.message);
       }
     }
 

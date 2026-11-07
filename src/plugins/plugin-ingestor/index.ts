@@ -74,6 +74,20 @@ export class IngestorPlugin {
     // 1. Scraping Determinístico + Sanitização contra Prompt Injection
     const document = await this.firecrawl.scrape(targetUrl, predefinedSource);
 
+    // Filtro Semântico de Granularidade: Injetar alerta anti-compêndio se detectada página agregadora
+    const isIndexCandidate = 
+      /(\b(lexicon|glossary|index|all-laws|catalog|overview)\b)/i.test(targetUrl) ||
+      /^(home|all laws|glossary|index|laws of ux)$/i.test(document.title.trim());
+
+    if (isIndexCandidate) {
+      console.warn(`⚠️ [Filtro de Granularidade]: Página com traços de índice agregador detectada (${targetUrl}). Forçando diretiva de granularidade atômica.`);
+      document.sanitizedContent = 
+        `[DIRETIVA DE GRANULARIDADE ATÔMICA: Esta página de origem pode conter múltiplos links ou conceitos. ` +
+        `Você é ESTRITAMENTE OBRIGADO a extrair e sintetizar UNICAMENTE UM CONCEITO ATÔMICO SINGULAR específico. ` +
+        `NUNCA crie um índice, compêndio ou léxico geral.]\n\n` + 
+        document.sanitizedContent;
+    }
+
     // 2. Busca Semântica no Banco Vetorial (pgvector)
     const route = await this.router.routeContent(document.sanitizedContent, {
       overrideThreshold: this.threshold,

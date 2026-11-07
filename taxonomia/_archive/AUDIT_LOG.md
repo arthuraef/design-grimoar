@@ -42,3 +42,4 @@
 | `src/plugins/plugin-academic-validator/validator.ts` | Strict epistemic validation | Active | Forbids name-dropping and cross-concept anchor contamination |
 | `src/plugins/plugin-publisher/publisher.ts` | Staging quarantine isolation | Active | Only `status: canonical` and `audit: APPROVED` published to public docs; drafts kept in `taxonomia/_staging/` |
 | `docs/src/content.config.ts`, `[...slug].astro`, etc. | Front-end gating | Active | Excludes staging/archive and unapproved verbetes from static paths and search |
+| `laws-of-ux-lexicon.md` | Quarantined to `taxonomia/_archive/quarantine-laws-of-ux-lexicon.md` | Preserved | Removed from public docs due to Granularity Filter (anti-index/compendium policy) |

@@ -6,6 +6,7 @@ import pg from 'pg';
 import { toSql } from 'pgvector/pg';
 import { VerbeteFrontmatter, MANDATORY_SECTIONS, extractFrontmatterAndBody, validateVerbete } from '../../schema.js';
 import { SemanticRouter } from '../plugin-ingestor/semantic-router.js';
+import { EmbeddingsCache, CachedSectionEmbedding } from '../../utils/embeddings-cache.js';
 
 const execFileAsync = promisify(execFile);
 const { Pool } = pg;
@@ -50,8 +51,10 @@ export class PublisherService {
   private githubBranch: string;
   private githubToken?: string;
   private allowFallback: boolean;
+  public embeddingsCache: EmbeddingsCache;
 
   constructor(private config: PublisherConfig = {}) {
+    this.embeddingsCache = new EmbeddingsCache();
     const dbUrl = config.databaseUrl || process.env.DATABASE_URL;
     if (dbUrl) {
       this.pool = new Pool({ connectionString: dbUrl });
@@ -196,7 +199,12 @@ export class PublisherService {
             );
 
             if (checkRes.rows.length === 0) {
-              console.log(`📥 [Publisher - Bootstrap]: Indexando no pgvector: "${frontmatter.title}" (${frontmatter.slug})...`);
+              const hasCache = this.embeddingsCache.hasValidCache(frontmatter.slug, content);
+              if (hasCache) {
+                console.log(`⚡ [Publisher - Bootstrap (Cache Hit)]: Indexando no pgvector via cache de embeddings (Zero API cost): "${frontmatter.title}" (${frontmatter.slug})...`);
+              } else {
+                console.log(`📥 [Publisher - Bootstrap (Cache Miss)]: Calculando embeddings e indexando no pgvector: "${frontmatter.title}" (${frontmatter.slug})...`);
+              }
               await this.updateVectorDatabase(frontmatter, content, file);
               indexedCount++;
             }
@@ -275,6 +283,14 @@ export class PublisherService {
     const processedUrlsFile = path.resolve('taxonomia/.processed-urls.json');
     if (fs.existsSync(processedUrlsFile)) {
       filesToCommit.push(processedUrlsFile);
+    }
+    const embeddingsCacheFile = path.resolve('taxonomia/.embeddings-cache.json');
+    if (fs.existsSync(embeddingsCacheFile)) {
+      filesToCommit.push(embeddingsCacheFile);
+    }
+    const failedUrlsFile = path.resolve('taxonomia/.failed-urls.json');
+    if (fs.existsSync(failedUrlsFile)) {
+      filesToCommit.push(failedUrlsFile);
     }
     const { commitHash, commitMessage, pushed } = await this.commitAndPush(filesToCommit, frontmatter);
 
@@ -444,12 +460,40 @@ export class PublisherService {
         // Limpa embeddings anteriores deste verbete para re-indexação limpa
         await client.query('DELETE FROM verbete_embeddings WHERE verbete_id = $1', [verbeteId]);
 
+        // Consulta cache versionado em disco (taxonomia/.embeddings-cache.json)
+        const cachedVerbete = this.embeddingsCache.getVerbete(frontmatter.slug, markdownContent);
+        const cachedSectionsMap = new Map<number, CachedSectionEmbedding>();
+        if (cachedVerbete) {
+          cachedVerbete.sections.forEach((s) => cachedSectionsMap.set(s.order, s));
+        }
+
+        const newCachedSections: CachedSectionEmbedding[] = [];
+
         for (let idx = 0; idx < sections.length; idx++) {
           const section = sections[idx];
-          const embeddingText = `${frontmatter.title} — ${section.title}\n${section.content}`;
+          const sectionHash = this.embeddingsCache.computeHash(section.content);
+          const cachedSec = cachedSectionsMap.get(idx);
 
-          // Gera vetor real de 1536 dimensões via SemanticRouter
-          const embeddingVector = await this.semanticRouter.generateEmbedding(embeddingText);
+          let embeddingVector: number[];
+          if (
+            cachedSec &&
+            cachedSec.contentHash === sectionHash &&
+            Array.isArray(cachedSec.embedding) &&
+            cachedSec.embedding.length > 0
+          ) {
+            embeddingVector = cachedSec.embedding;
+          } else {
+            const embeddingText = `${frontmatter.title} — ${section.title}\n${section.content}`;
+            embeddingVector = await this.semanticRouter.generateEmbedding(embeddingText);
+          }
+
+          newCachedSections.push({
+            title: section.title,
+            order: idx,
+            content: section.content,
+            contentHash: sectionHash,
+            embedding: embeddingVector,
+          });
 
           const insertEmbeddingQuery = `
             INSERT INTO verbete_embeddings (
@@ -467,6 +511,14 @@ export class PublisherService {
           ]);
           chunksIndexed++;
         }
+
+        // Atualiza e persiste cache no disco para zero custo nos próximos deploys
+        this.embeddingsCache.setVerbete(
+          frontmatter.slug,
+          frontmatter.title,
+          markdownContent,
+          newCachedSections
+        );
 
         await client.query('COMMIT');
         console.log(`[Publisher - pgvector]: ${chunksIndexed} seções indexadas no banco real com HNSW.`);

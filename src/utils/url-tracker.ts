@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { validateVerbete } from '../schema.js';
+import { DeadLetterQueue } from './dead-letter-queue.js';
 
 export interface ProcessedUrlEntry {
   url: string;
@@ -207,9 +208,14 @@ export const CANONICAL_CANDIDATE_QUEUE: CandidateSource[] = [
 export class ProcessedUrlsTracker {
   private filePath: string;
   private state: ProcessedUrlsState;
+  public dlq: DeadLetterQueue;
 
-  constructor(filePath: string = path.resolve('taxonomia/.processed-urls.json')) {
+  constructor(
+    filePath: string = path.resolve('taxonomia/.processed-urls.json'),
+    dlq: DeadLetterQueue = new DeadLetterQueue()
+  ) {
     this.filePath = filePath;
+    this.dlq = dlq;
     this.state = this.loadState();
     this.syncWithExistingTaxonomyMarkdown();
   }
@@ -311,7 +317,7 @@ export class ProcessedUrlsTracker {
 
   public getNextUnprocessedCandidate(): CandidateSource | null {
     for (const candidate of CANONICAL_CANDIDATE_QUEUE) {
-      if (!this.isProcessed(candidate.url)) {
+      if (!this.isProcessed(candidate.url) && !this.dlq.isQuarantined(candidate.url)) {
         return candidate;
       }
     }
@@ -321,7 +327,7 @@ export class ProcessedUrlsTracker {
   public getNextUnprocessedBatch(batchSize: number = 2): CandidateSource[] {
     const batch: CandidateSource[] = [];
     for (const candidate of CANONICAL_CANDIDATE_QUEUE) {
-      if (!this.isProcessed(candidate.url)) {
+      if (!this.isProcessed(candidate.url) && !this.dlq.isQuarantined(candidate.url)) {
         batch.push(candidate);
         if (batch.length >= batchSize) {
           break;

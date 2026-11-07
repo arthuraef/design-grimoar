@@ -95,3 +95,10 @@ jobs:
           BATCH_SIZE: ${{ inputs.batch_size || '1' }}
           INITIAL_JITTER: ${{ inputs.skip_initial_jitter && 'false' || 'true' }}
         run: npm run curator:batch
+
+      - name: Keep-alive workflow (impede desativação do cron por inatividade no GitHub)
+        uses: gautamkrishnar/keepalive-workflow@v2
+        if: always()
+        with:
+          committer_username: 'github-actions[bot]'
+          committer_email: 'github-actions[bot]@users.noreply.github.com'

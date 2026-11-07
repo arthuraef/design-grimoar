@@ -479,6 +479,102 @@ html, body {
   text-decoration-color: var(--accent-link);
 }
 
+/* Unresolved WikiLinks (Conceito em catalogação) */
+.notion-wikilink-unresolved {
+  color: var(--text-secondary);
+  border-bottom: 1px dashed var(--text-muted);
+  cursor: help;
+  text-decoration: none !important;
+  opacity: 0.85;
+  transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.notion-wikilink-unresolved:hover {
+  opacity: 1;
+  color: var(--text-primary);
+  border-bottom-color: var(--text-secondary);
+}
+
+/* Backlinks Section (Mencionado em) */
+.notion-backlinks {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-divider);
+}
+
+.notion-backlinks-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.notion-backlinks-icon {
+  font-size: 16px;
+}
+
+.notion-backlinks-title {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 12px;
+}
+
+.notion-backlinks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notion-backlink-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  text-decoration: none !important;
+  background-color: transparent;
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.notion-backlink-item:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-subtle);
+}
+
+.notion-backlink-item-icon {
+  font-size: 15px;
+  opacity: 0.8;
+}
+
+.notion-backlink-item-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.notion-backlink-item-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.notion-backlink-item:hover .notion-backlink-item-title {
+  color: var(--accent-link);
+}
+
+.notion-backlink-item-domain {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--bg-hover);
+  color: var(--text-muted);
+}
+
 /* Divider */
 .notion-content hr {
   border: none;

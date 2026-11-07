@@ -13,16 +13,54 @@ export async function getStaticPaths() {
     const slug = doc.data.slug || doc.id.replace(/\.md$/, '');
     return {
       params: { slug },
-      props: { doc },
+      props: { doc, allDocs: canonicalDocs },
     };
   });
 }
 
-const { doc } = Astro.props;
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+}
+
+const { doc, allDocs = [] } = Astro.props;
 const { Content } = await render(doc);
 
 const frontmatter = doc.data;
 const title = frontmatter.title || doc.id;
+const currentSlug = frontmatter.slug || doc.id.replace(/\.md$/, '');
+const titleSlug = slugify(title);
+const aliasSlugs = (frontmatter.aliases || []).map((a: string) => slugify(a));
+
+// Identificar Backlinks (Verbetes publicados que contêm [[WikiLinks]] apontando para este verbete)
+const backlinks = (allDocs as any[])
+  .filter((d) => d.id !== doc.id)
+  .filter((d) => {
+    const rawBody = d.body || '';
+    if (!rawBody.includes('[[')) return false;
+    const matches = rawBody.matchAll(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g);
+    for (const match of matches) {
+      const targetSlug = slugify(match[1]);
+      if (
+        targetSlug === currentSlug ||
+        targetSlug === titleSlug ||
+        aliasSlugs.includes(targetSlug)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  })
+  .map((d) => ({
+    title: d.data.title || d.id,
+    slug: d.data.slug || d.id.replace(/\.md$/, ''),
+    domain: d.data.domain || '',
+    summary: d.data.summary || '',
+  }));
 const domain = frontmatter.domain || '';
 const subdomain = frontmatter.subdomain || '';
 const status = frontmatter.status || 'canonical';
@@ -122,5 +160,26 @@ const breadcrumbs = [
     <div class="notion-content">
       <Content />
     </div>
+
+    <!-- Seção Minimalista de Backlinks (Mencionado em) -->
+    {backlinks.length > 0 && (
+      <div class="notion-backlinks" data-pagefind-ignore>
+        <div class="notion-backlinks-header">
+          <span class="notion-backlinks-icon">🔗</span>
+          <span class="notion-backlinks-title">Mencionado em ({backlinks.length})</span>
+        </div>
+        <div class="notion-backlinks-list">
+          {backlinks.map((bl) => (
+            <a href={`/design-grimoar/${bl.slug}`} class="notion-backlink-item">
+              <span class="notion-backlink-item-icon">📄</span>
+              <div class="notion-backlink-item-content">
+                <span class="notion-backlink-item-title">{bl.title}</span>
+                {bl.domain && <span class="notion-backlink-item-domain">{bl.domain}</span>}
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+    )}
   </article>
 </NotionLayout>
