@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { withExponentialBackoff } from '../../utils/retry.js';
 
 export interface SynthesizerInput {
   mode: 'CREATE' | 'MERGE';
@@ -141,33 +142,41 @@ export class SynthesizerService {
       console.log(`[Lexicógrafo]: Enviando requisição real para ${endpoint} (${this.model})...`);
 
       try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.apiKey}`,
+        const content = await withExponentialBackoff(
+          async () => {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${this.apiKey}`,
+              },
+              body: JSON.stringify({
+                model: this.model,
+                messages: [
+                  { role: 'system', content: this.systemPrompt },
+                  { role: 'user', content: userMessage },
+                ],
+                temperature: this.temperature,
+              }),
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`[Lexicógrafo API Error HTTP ${response.status}]: ${errorText}`);
+            }
+
+            const data: any = await response.json();
+            const text = data.choices?.[0]?.message?.content;
+            if (!text) {
+              throw new Error('[Lexicógrafo]: API retornou resposta vazia.');
+            }
+            return text.trim();
           },
-          body: JSON.stringify({
-            model: this.model,
-            messages: [
-              { role: 'system', content: this.systemPrompt },
-              { role: 'user', content: userMessage },
-            ],
-            temperature: this.temperature,
-          }),
-        });
+          { maxRetries: 3, initialDelayMs: 2000 },
+          `Lexicógrafo (${this.model})`
+        );
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`[Lexicógrafo API Error HTTP ${response.status}]: ${errorText}`);
-        }
-
-        const data: any = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (!content) {
-          throw new Error('[Lexicógrafo]: API retornou resposta vazia.');
-        }
-        return content.trim();
+        return content;
       } catch (err: any) {
         if (!this.allowFallback) {
           throw err;

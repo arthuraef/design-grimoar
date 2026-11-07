@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolvePromptFile, sanitizeBaseUrl } from '../plugin-synthesizer/synthesizer.js';
+import { withExponentialBackoff } from '../../utils/retry.js';
 
 export interface AuditedClaim {
   claim: string;
@@ -88,31 +89,37 @@ export class AcademicValidatorService {
       console.log(`[Auditor Acadêmico]: Enviando requisição real para ${endpoint} (${this.model})...`);
 
       try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.apiKey}`,
+        return await withExponentialBackoff(
+          async () => {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${this.apiKey}`,
+              },
+              body: JSON.stringify({
+                model: this.model,
+                response_format: { type: 'json_object' },
+                messages: [
+                  { role: 'system', content: this.systemPrompt },
+                  { role: 'user', content: userMessage },
+                ],
+                temperature: this.temperature,
+              }),
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`[Auditor Acadêmico API Error HTTP ${response.status}]: ${errorText}`);
+            }
+
+            const data: any = await response.json();
+            const rawJson = data.choices?.[0]?.message?.content || '{}';
+            return this.parseAuditResponse(rawJson, draftMarkdown);
           },
-          body: JSON.stringify({
-            model: this.model,
-            response_format: { type: 'json_object' },
-            messages: [
-              { role: 'system', content: this.systemPrompt },
-              { role: 'user', content: userMessage },
-            ],
-            temperature: this.temperature,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`[Auditor Acadêmico API Error HTTP ${response.status}]: ${errorText}`);
-        }
-
-        const data: any = await response.json();
-        const rawJson = data.choices?.[0]?.message?.content || '{}';
-        return this.parseAuditResponse(rawJson, draftMarkdown);
+          { maxRetries: 3, initialDelayMs: 2000 },
+          `Auditor Acadêmico (${this.model})`
+        );
       } catch (err: any) {
         if (!this.allowFallback) {
           throw err;

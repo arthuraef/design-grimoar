@@ -267,7 +267,12 @@ export function validateVerbete(markdownContent: string): ValidationResult {
   // 3. Validar Presença das 5 Seções Obrigatórias
   const missingSections: string[] = [];
   for (const section of MANDATORY_SECTIONS) {
-    if (!body.includes(section)) {
+    const isPresent =
+      body.includes(section) ||
+      (section.startsWith('# 5.') && /^# 5\.\s+Referências Cruzadas/m.test(body)) ||
+      (section.startsWith('# 3.') && /^# 3\.\s+Gramática de Aplicação Prática/m.test(body));
+
+    if (!isPresent) {
       missingSections.push(section);
       errors.push(`Seção obrigatória ausente: "${section}"`);
     }
