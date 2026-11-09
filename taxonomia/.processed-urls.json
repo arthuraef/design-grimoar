@@ -5,7 +5,8 @@
     "https://www.routledge.com/The-Ecological-Approach-to-Visual-Perception/Gibson/p/book/9781848725782",
     "https://lawsofux.com/jakobs-law/",
     "https://www.nngroup.com/videos/jakobs-law-internet-ux/",
-    "https://lawsofux.com/"
+    "https://lawsofux.com/",
+    "https://lawsofux.com/en/fitts-law/"
   ],
   "history": [
     {
@@ -47,6 +48,13 @@
       "url": "https://lawsofux.com/",
       "slug": "laws-of-ux-lexicon",
       "title": "Laws of UX Lexicon",
+      "sourceId": "existing-file",
+      "processedAt": "2026-11-06T00:00:00Z"
+    },
+    {
+      "url": "https://lawsofux.com/en/fitts-law/",
+      "slug": "fittss-law",
+      "title": "Fitts's Law",
       "sourceId": "existing-file",
       "processedAt": "2026-11-06T00:00:00Z"
     }
