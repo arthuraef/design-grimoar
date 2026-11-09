@@ -1,0 +1,32 @@
+---
+// LanguageToggle.astro — Notion-Style Language Switcher (PT-BR / EN)
+---
+
+<div class="notion-language-wrapper">
+  <button
+    id="language-toggle"
+    class="notion-language-toggle"
+    type="button"
+    aria-label="Selecionar idioma / Select language"
+    aria-haspopup="true"
+    aria-expanded="false"
+    title="Alternar idioma / Switch language"
+  >
+    <span id="language-icon" aria-hidden="true">🌐</span>
+    <span id="language-label" style="font-size: 12px; font-weight: 500;">PT-BR</span>
+    <span class="notion-language-chevron" aria-hidden="true">▾</span>
+  </button>
+
+  <div id="language-dropdown" class="notion-language-dropdown" role="menu" hidden>
+    <button type="button" class="notion-language-option active" data-lang="pt-BR" role="menuitem">
+      <span class="notion-lang-flag">🇧🇷</span>
+      <span class="notion-lang-name">Português (Brasil)</span>
+      <span class="notion-lang-check">✓</span>
+    </button>
+    <button type="button" class="notion-language-option" data-lang="en" role="menuitem">
+      <span class="notion-lang-flag">🇺🇸</span>
+      <span class="notion-lang-name">English</span>
+      <span class="notion-lang-check">✓</span>
+    </button>
+  </div>
+</div>

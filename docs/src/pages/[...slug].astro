@@ -89,12 +89,12 @@ const breadcrumbs = [
     <!-- Notion Properties Table & Filtros Facetados Pagefind -->
     <div class="notion-properties">
       <div class="notion-property-row">
-        <div class="notion-property-key"><span>🏷️</span> <span>Status</span></div>
+        <div class="notion-property-key"><span>🏷️</span> <span data-i18n="doc.prop_status">Status</span></div>
         <div class="notion-property-value">
           <span class="notion-tag" data-pagefind-filter="Status">{status}</span>
           {audit?.status && (
             <span class="notion-tag" style="margin-left: 6px; background-color: var(--bg-hover);">
-              Auditoria: {audit.status}
+              <span data-i18n="doc.prop_audit">Auditoria:</span> {audit.status}
             </span>
           )}
         </div>
@@ -102,7 +102,7 @@ const breadcrumbs = [
 
       {domain && (
         <div class="notion-property-row">
-          <div class="notion-property-key"><span>📂</span> <span>Domínio</span></div>
+          <div class="notion-property-key"><span>📂</span> <span data-i18n="doc.prop_domain">Domínio</span></div>
           <div class="notion-property-value">
             <span class="notion-tag" data-pagefind-filter="Categoria" style="font-weight: 500;">
               {domain}
@@ -117,13 +117,13 @@ const breadcrumbs = [
       )}
 
       <div class="notion-property-row">
-        <div class="notion-property-key"><span>🔢</span> <span>Versão</span></div>
+        <div class="notion-property-key"><span>🔢</span> <span data-i18n="doc.prop_version">Versão</span></div>
         <div class="notion-property-value">{version}</div>
       </div>
 
       {anchors.length > 0 && (
         <div class="notion-property-row">
-          <div class="notion-property-key"><span>🎓</span> <span>Âncoras</span></div>
+          <div class="notion-property-key"><span>🎓</span> <span data-i18n="doc.prop_anchors">Âncoras</span></div>
           <div class="notion-property-value" data-pagefind-meta="anchors">
             {anchors.join(' • ')}
           </div>
@@ -132,7 +132,7 @@ const breadcrumbs = [
 
       {tags.length > 0 && (
         <div class="notion-property-row">
-          <div class="notion-property-key"><span>🔖</span> <span>Tags</span></div>
+          <div class="notion-property-key"><span>🔖</span> <span data-i18n="doc.prop_tags">Tags</span></div>
           <div class="notion-property-value">
             <div class="notion-tags">
               {tags.map((tag: string) => (
@@ -151,7 +151,7 @@ const breadcrumbs = [
       <div class="notion-callout" data-pagefind-meta="summary">
         <div class="notion-callout-icon" data-pagefind-ignore>💡</div>
         <div class="notion-callout-body">
-          <strong>Síntese Conceitual:</strong> {summary}
+          <strong data-i18n="doc.callout_synthesis">Síntese Conceitual:</strong> {summary}
         </div>
       </div>
     )}
@@ -166,7 +166,9 @@ const breadcrumbs = [
       <div class="notion-backlinks" data-pagefind-ignore>
         <div class="notion-backlinks-header">
           <span class="notion-backlinks-icon">🔗</span>
-          <span class="notion-backlinks-title">Mencionado em ({backlinks.length})</span>
+          <span class="notion-backlinks-title" data-i18n="doc.backlinks_title" data-i18n-count={backlinks.length}>
+            Mencionado em ({backlinks.length})
+          </span>
         </div>
         <div class="notion-backlinks-list">
           {backlinks.map((bl) => (

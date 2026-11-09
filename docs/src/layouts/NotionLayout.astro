@@ -1,6 +1,7 @@
 ---
 import Sidebar from '../components/Sidebar.astro';
 import ThemeToggle from '../components/ThemeToggle.astro';
+import LanguageToggle from '../components/LanguageToggle.astro';
 import Search from '../components/Search.astro';
 import '../styles/notion.css';
 
@@ -27,20 +28,29 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="grimoar-slug" content={currentSlug} />
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📓</text></svg>" />
     
-    <!-- Script Anti-FOUC para Dark/Light Mode Imediato -->
+    <!-- Script Anti-FOUC para Dark/Light Mode e Idioma Imediatos -->
     <script is:inline>
       (function() {
         try {
-          const stored = localStorage.getItem('grimoar-theme');
-          const preferred = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-          document.documentElement.setAttribute('data-theme', preferred);
+          const storedTheme = localStorage.getItem('grimoar-theme');
+          const preferredTheme = storedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', preferredTheme);
+
+          const storedLang = localStorage.getItem('grimoar-lang') || 'pt-BR';
+          document.documentElement.lang = storedLang === 'en' ? 'en' : 'pt-BR';
+          document.documentElement.setAttribute('data-lang', storedLang);
         } catch (e) {}
       })();
     </script>
+
+    <!-- Dados e Engine de Internacionalização (i18n) -->
+    <script is:inline src={`${cleanBase}/scripts/i18n-data.js`}></script>
+    <script is:inline src={`${cleanBase}/scripts/i18n-client.js`}></script>
   </head>
   <body>
     <div class="notion-layout">
@@ -57,7 +67,7 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
                 {idx > 0 && <span style="opacity: 0.4;">/</span>}
                 {crumb.href ? (
                   <a href={`${cleanBase}${crumb.href === '/' ? '/' : crumb.href}`} class="notion-breadcrumb-link">
-                    {crumb.label}
+                    <span data-i18n={idx === 0 ? 'breadcrumbs.home' : undefined}>{crumb.label}</span>
                   </a>
                 ) : (
                   <span style="color: var(--text-main); font-weight: 500;">{crumb.label}</span>
@@ -67,11 +77,19 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
           </nav>
 
           <div class="notion-header-actions">
-            <button type="button" class="notion-header-search-btn" id="header-search-trigger" aria-label="Abrir busca no Grimoar">
+            <!-- Botão de Busca no Header: visível apenas quando o campo de busca do corpo estiver escondido pelo scroll -->
+            <button
+              type="button"
+              class="notion-header-search-btn"
+              id="header-search-trigger"
+              aria-label="Abrir busca no Grimoar"
+              data-i18n-aria="header.search"
+            >
               <span>🔍</span>
-              <span>Buscar</span>
+              <span data-i18n="header.search">Buscar</span>
               <kbd class="notion-kbd">⌘K</kbd>
             </button>
+            <LanguageToggle />
             <ThemeToggle />
           </div>
         </header>
@@ -85,5 +103,42 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
 
     <!-- Componente Command Palette Search do Pagefind -->
     <Search base={cleanBase} />
+
+    <!-- Script de Sincronização do Campo de Busca com o Scroll -->
+    <script is:inline>
+      (function () {
+        const headerSearch = document.getElementById('header-search-trigger');
+        const bodySearch = document.querySelector('#hero-search-trigger, [data-body-search]');
+
+        if (headerSearch && bodySearch) {
+          // Quando houver um campo de busca no corpo da página (ex: home), inicia oculto no header
+          headerSearch.classList.add('is-hidden');
+
+          // Observa a visibilidade do campo de busca do corpo
+          const observer = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                // Se o campo de busca do corpo estiver visível no viewport, esconde o do header.
+                // Se for rolado para fora do viewport (escondido pelo scroll), exibe o do header.
+                if (entry.isIntersecting) {
+                  headerSearch.classList.add('is-hidden');
+                } else {
+                  headerSearch.classList.remove('is-hidden');
+                }
+              });
+            },
+            {
+              rootMargin: '-5px 0px 0px 0px',
+              threshold: 0,
+            }
+          );
+
+          observer.observe(bodySearch);
+        } else if (headerSearch) {
+          // Em páginas sem campo de busca no corpo (ex: verbetes), mantém visível no topo
+          headerSearch.classList.remove('is-hidden');
+        }
+      })();
+    </script>
   </body>
 </html>

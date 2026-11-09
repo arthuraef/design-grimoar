@@ -10,12 +10,12 @@ const { currentSlug = '', base = '' } = Astro.props;
 
 // Lista canônica de domínios com títulos e ícones refinados
 const domains = [
-  { id: '01-psicologia-cognitiva', label: '01. Psicologia Cognitiva', icon: '🧠' },
-  { id: '02-ux-interaction-design', label: '02. UX & Interaction', icon: '📐' },
-  { id: '03-ui-visual-design', label: '03. UI & Visual Design', icon: '🎨' },
-  { id: '04-design-systems', label: '04. Design Systems', icon: '🧱' },
-  { id: '05-product-design-strategy', label: '05. Product Strategy', icon: '🎯' },
-  { id: '06-designops-engineering', label: '06. DesignOps & Eng.', icon: '⚙️' },
+  { id: '01-psicologia-cognitiva', label: '01. Psicologia Cognitiva', icon: '🧠', i18nKey: 'domain.01.label' },
+  { id: '02-ux-interaction-design', label: '02. UX & Interaction', icon: '📐', i18nKey: 'domain.02.label' },
+  { id: '03-ui-visual-design', label: '03. UI & Visual Design', icon: '🎨', i18nKey: 'domain.03.label' },
+  { id: '04-design-systems', label: '04. Design Systems', icon: '🧱', i18nKey: 'domain.04.label' },
+  { id: '05-product-design-strategy', label: '05. Product Strategy', icon: '🎯', i18nKey: 'domain.05.label' },
+  { id: '06-designops-engineering', label: '06. DesignOps & Eng.', icon: '⚙️', i18nKey: 'domain.06.label' },
 ];
 
 let allVerbetes: any[] = [];
@@ -42,16 +42,22 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
   </div>
 
   <!-- Botão de Busca Rápida Estilo Notion (Quick Find / Command Palette) -->
-  <button type="button" class="notion-sidebar-search-btn" id="sidebar-search-trigger" aria-label="Abrir busca no Grimoar (Cmd + K)">
+  <button
+    type="button"
+    class="notion-sidebar-search-btn"
+    id="sidebar-search-trigger"
+    aria-label="Abrir busca no Grimoar (Cmd + K)"
+    data-i18n-aria="sidebar.search_placeholder"
+  >
     <span class="notion-sidebar-search-icon">🔍</span>
-    <span class="notion-sidebar-search-text">Buscar no Grimoar...</span>
+    <span class="notion-sidebar-search-text" data-i18n="sidebar.search_placeholder">Buscar no Grimoar...</span>
     <kbd class="notion-kbd">⌘K</kbd>
   </button>
 
   <nav class="notion-sidebar-nav">
     <a href={`${cleanBase}/`} class={`notion-nav-item ${currentSlug === '' ? 'active' : ''}`}>
       <span class="notion-nav-icon">◽️</span>
-      <span>Início / Cânone</span>
+      <span data-i18n="sidebar.nav_home">Início / Cânone</span>
     </a>
 
     {domains.map((domain) => {
@@ -62,9 +68,12 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
 
       return (
         <div class="notion-sidebar-section">
-          <div class="notion-sidebar-title">{domain.label}</div>
+          <div class="notion-sidebar-title" data-i18n={domain.i18nKey}>{domain.label}</div>
           {verbetesInDomain.length === 0 ? (
-            <div style="font-size: 12px; color: var(--text-faint); padding: 4px 10px; font-style: italic;">
+            <div
+              style="font-size: 12px; color: var(--text-faint); padding: 4px 10px; font-style: italic;"
+              data-i18n="sidebar.curating"
+            >
               Em curadoria...
             </div>
           ) : (

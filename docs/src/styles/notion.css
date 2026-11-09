@@ -238,7 +238,111 @@ html, body {
 .notion-header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+}
+
+/* Language Selector */
+.notion-language-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.notion-language-toggle {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 6px 9px;
+  color: var(--text-main);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-family: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+}
+
+.notion-language-toggle:hover {
+  background-color: var(--bg-hover);
+}
+
+.notion-language-chevron {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-left: 1px;
+  transition: transform 0.15s ease;
+}
+
+.notion-language-toggle[aria-expanded="true"] .notion-language-chevron {
+  transform: rotate(180deg);
+}
+
+.notion-language-dropdown {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  min-width: 175px;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(15, 15, 15, 0.1), 0 0 0 1px rgba(15, 15, 15, 0.04);
+  padding: 4px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: notionPopupIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.notion-language-dropdown[hidden] {
+  display: none !important;
+}
+
+.notion-language-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: 4px;
+  background: none;
+  border: none;
+  color: var(--text-main);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background-color 0.1s ease;
+}
+
+.notion-language-option:hover {
+  background-color: var(--bg-hover);
+}
+
+.notion-language-option.active {
+  font-weight: 600;
+  background-color: var(--bg-hover);
+}
+
+.notion-lang-flag {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.notion-lang-name {
+  flex: 1;
+}
+
+.notion-lang-check {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--accent-blue);
+  opacity: 0;
+}
+
+.notion-language-option.active .notion-lang-check {
+  opacity: 1;
 }
 
 /* Theme Toggle Button */
@@ -811,12 +915,26 @@ html, body {
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0.22s ease,
+              background-color 0.15s ease,
+              color 0.15s ease;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
 }
 
 .notion-header-search-btn:hover {
   background-color: var(--bg-hover);
   color: var(--text-main);
+}
+
+.notion-header-search-btn.is-hidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  transform: translateY(-4px) scale(0.96) !important;
 }
 
 /* Search Backdrop Overlay */

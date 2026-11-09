@@ -10,7 +10,7 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
 
 <!-- Modal de Busca Flutuante (Notion Command Palette) -->
 <div id="notion-search-backdrop" class="notion-search-backdrop" aria-hidden="true">
-  <div class="notion-search-dialog" role="dialog" aria-modal="true" aria-label="Buscar no Grimoar">
+  <div class="notion-search-dialog" role="dialog" aria-modal="true" aria-label="Buscar no Grimoar" data-i18n-aria="search.placeholder">
     
     <!-- Barra de Input Superior -->
     <div class="notion-search-input-wrapper">
@@ -20,6 +20,7 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
         id="notion-search-input"
         class="notion-search-input"
         placeholder="Buscar por verbetes, heurísticas, âncoras, tags... (Cmd + K)"
+        data-i18n-placeholder="search.placeholder"
         autocomplete="off"
         spellcheck="false"
       />
@@ -28,14 +29,14 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
 
     <!-- Barra de Filtros Facetados (Categoria & Tags) -->
     <div class="notion-search-facets" id="notion-search-facets">
-      <span class="notion-facet-label">Filtros:</span>
-      <button type="button" class="notion-facet-pill active" data-filter-type="all">Todos</button>
+      <span class="notion-facet-label" data-i18n="search.filters_label">Filtros:</span>
+      <button type="button" class="notion-facet-pill active" data-filter-type="all" data-i18n="search.filter_all">Todos</button>
       <!-- Pílulas de categorias e tags inseridas dinamicamente via Pagefind -->
     </div>
 
     <!-- Lista de Resultados Dinâmicos -->
     <div class="notion-search-results" id="notion-search-results">
-      <div class="notion-search-empty">
+      <div class="notion-search-empty" data-i18n="search.empty_state">
         Digite um termo ou escolha uma categoria para buscar no cânone...
       </div>
     </div>
@@ -43,11 +44,11 @@ const cleanBase = base ? base.replace(/\/$/, '') : '';
     <!-- Rodapé do Modal com Dicas de Teclado -->
     <footer class="notion-search-footer">
       <div class="notion-search-shortcuts">
-        <span><kbd class="notion-kbd">↑</kbd> <kbd class="notion-kbd">↓</kbd> Navegar</span>
-        <span><kbd class="notion-kbd">↵</kbd> Abrir</span>
-        <span><kbd class="notion-kbd">Esc</kbd> Fechar</span>
+        <span><kbd class="notion-kbd">↑</kbd> <kbd class="notion-kbd">↓</kbd> <span data-i18n="search.shortcut_navigate">Navegar</span></span>
+        <span><kbd class="notion-kbd">↵</kbd> <span data-i18n="search.shortcut_open">Abrir</span></span>
+        <span><kbd class="notion-kbd">Esc</kbd> <span data-i18n="search.shortcut_close">Fechar</span></span>
       </div>
-      <div style="font-size: 11px; opacity: 0.7;">
+      <div style="font-size: 11px; opacity: 0.7;" data-i18n="search.engine_tag">
         ⚡ Indexação Pagefind
       </div>
     </footer>
