@@ -92,13 +92,23 @@ jobs:
           STATIC_SITE_CONTENT_DIR: ./docs/src/content/docs
           NOTIFICATIONS_WEBHOOK_URL: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
           STEALTH_MODE: 'true'
-          BATCH_SIZE: ${{ inputs.batch_size || '1' }}
-          INITIAL_JITTER: ${{ inputs.skip_initial_jitter && 'false' || 'true' }}
+          BATCH_SIZE: ${{ github.event.inputs.batch_size || '1' }}
+          INITIAL_JITTER: ${{ github.event.inputs.skip_initial_jitter == 'true' && 'false' || 'true' }}
         run: npm run curator:batch
 
-      - name: Keep-alive workflow (impede desativação do cron por inatividade no GitHub)
-        uses: gautamkrishnar/keepalive-workflow@v2
+      - name: Keep-alive (previne desativação do cron por inatividade no GitHub)
         if: always()
-        with:
-          committer_username: 'github-actions[bot]'
-          committer_email: 'github-actions[bot]@users.noreply.github.com'
+        run: |
+          # O GitHub desativa crons agendados se o repositório ficar 60 dias sem commits.
+          # Se não houver commits recentes nos últimos 50 dias, gera um commit de pulso para manter o cron ativo.
+          LAST_COMMIT_DATE=$(git log -1 --format=%ct)
+          NOW=$(date +%s)
+          DIFF_DAYS=$(( (NOW - LAST_COMMIT_DATE) / 86400 ))
+          echo "Dias desde o último commit: $DIFF_DAYS"
+          if [ "$DIFF_DAYS" -ge 50 ]; then
+            echo "Repositório inativo há $DIFF_DAYS dias. Realizando commit keep-alive..."
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "chore(keep-alive): pulse commit to maintain active cron schedule"
+            git push origin main
+          fi
