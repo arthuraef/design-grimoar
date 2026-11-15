@@ -8,100 +8,87 @@ status: "canonical"
 version: "1.0.0"
 created_at: "2026-11-06T00:00:00Z"
 updated_at: "2026-11-06T00:00:00Z"
-summary: "Modelo ergonômico e psicofísico que estabelece que o tempo necessário para atingir um alvo é uma função da distância até ele dividida por sua dimensão física."
+summary: "Modelo preditivo de controle motor e ergonomia de interação onde o tempo para atingir um alvo é função da distância até ele e do seu tamanho."
 tags:
-  - "fitts-law"
-  - "hci"
   - "usabilidade"
-  - "ergonomia"
   - "interaction-design"
+  - "ergonomia"
+  - "fitts-law"
 aliases:
   - "Lei de Fitts"
-  - "Fitts Law"
 academic_anchors:
-  - "Fitts, P. M. (1954) - The information capacity of the human motor system in controlling the amplitude of movement"
-  - "MacKenzie, I. S. (1992) - Fitts' law as a research and design model in human-computer interaction"
+  - "Fitts, Paul M. (1954) - The Information Capacity of the Human Motor System in Controlling the Amplitude of Movement"
 audit:
   status: "APPROVED"
   auditor: "academic-auditor-v1"
   audited_at: "2026-11-06T00:00:00Z"
   academic_anchor_added: []
 sources:
-  - title: "Laws of UX: Fitts's Law"
+  - title: "Laws of UX - Fitts's Law"
     url: "https://lawsofux.com/en/fitts-law/"
     type: "article"
     accessed_at: "2026-11-06"
 cross_references:
   - "[[HicksLaw]]"
   - "[[CognitiveLoad]]"
-  - "[[SteeringLaw]]"
+  - "[[VisualHierarchy]]"
+  - "[[JakobsLaw]]"
 ---
 
 # 1. Definição Canônica
 
-A **Fitts's Law** (Lei de Fitts) é um modelo de controle motor e ergonomia cognitiva que prevê o *Target Acquisition Time* (tempo de aquisição de alvo) em interfaces físicas e digitais. A lei estabelece formalmente que o tempo necessário para mover um dispositivo de apontamento (ou o próprio membro corporal) até um alvo é proporcional à razão entre a distância percorrida e a largura do alvo final.
-
-Matematicamente, a sua formulação mais aceita no campo de *Human-Computer Interaction* (HCI) — a variação de Shannon — é expressa como:
-
-$$MT = a + b \log_2 \left( \frac{D}{W} + 1 \right)$$
-
-Onde:
-*   $MT$ representa o *Movement Time* (Tempo de Movimento).
-*   $a$ e $b$ são constantes empíricas derivadas de regressão linear para um dispositivo de entrada específico.
-*   $D$ é a *Distance* (Distância) do ponto inicial até o centro do alvo.
-*   $W$ é a *Width* (Largura) do alvo medida ao longo do eixo de movimento.
-*   O termo $\log_2 \left( \frac{D}{W} + 1 \right)$ é denominado *Index of Difficulty* (ID), mensurado em *bits*.
+Fitts's Law (Lei de Fitts) é um modelo ergonômico e psicofísico aplicado ao *interaction design* e à interação humano-computador que estabelece que o tempo necessário para mover um apontador até uma determinada área de alvo é uma função matemática direta da distância até esse alvo, dividida pela sua dimensão física. Formulada pelo psicólogo Paul Fitts em 1954, a lei prevê que elementos interativos maiores e posicionados mais próximos do ponto de origem da ação reduzem substancialmente o tempo de execução e o esforço motor do usuário.
 
 ---
 
 # 2. Fundamentação Teórica e Cognitiva
 
-Formulada pelo psicólogo Paul Fitts em 1954, a lei fundamenta-se na adaptação da Teoria da Informação de Claude Shannon aos sistemas neuromusculares humanos. O sistema motor humano é modelado como um canal de comunicação de capacidade limitada, onde o ato de mover o cursor ou o dedo até uma área delimitada consome capacidade de processamento de informação.
+A base científica de Fitts's Law assenta na teoria da informação e no controle neuromotor humano. O modelo é matematizado por meio do *Index of Difficulty* (ID), expresso em bits:
 
-O processo psicofísico desdobra-se em duas fases motoras distintas:
-1.  **Fase Balística (Movimento Primário):** Um deslocamento rápido de alta velocidade em direção genérica ao alvo, executado de forma pré-programada pelo sistema nervoso central sem feedback sensorial ostensivo.
-2.  **Fase Homogênea de Ajuste Fine (Movimento Secundário):** Micromovimentos orientados por *visual feedback loop* para alinhar o ponteiro exatamente dentro da *bounding box* do elemento interativo.
+$$ID = \log_2\left(\frac{2D}{W}\right)$$
 
-Quanto menor for o alvo ($W$) e maior a distância ($D$), mais ciclos de correção visual-motora são exigidos, aumentando de forma logarítmica o valor de $MT$. 
+em que $D$ representa a distância (*target distance*) até o elemento e $W$ corresponde à largura do alvo (*target size*) ao longo do eixo do movimento.
 
-Um corolário crítico da Fitts's Law no contexto de *Graphical User Interfaces* (GUI) é o conceito de alvos com dimensão infinita. As bordas e cantos físicos da tela (*screen edges* e *screen corners*) impedem que o cursor ultrapasse o limite de pixels disponível, reduzindo o custo de erro de ultrapassagem (*overshoot*) a zero e tornando essas regiões excepcionalmente eficientes para alvos de alta frequência.
+Sob a perspectiva da psicologia cognitiva e da biomecânica, o deslocamento em direção a um objeto interativo não ocorre como um impulso contínuo único, mas divide-se em duas etapas:
+1. **Fase Balística:** Um movimento de aproximação rápido e de alta amplitude em direção à zona geral do alvo.
+2. **Fase de Ajuste Fino:** Uma sequência de microcorreções contínuas coordenadas por *feedback loops* visuo-motores até atingir a superfície exata do elemento.
+
+Quando o *target size* é reduzido ou a *target distance* aumenta, a necessidade de processamento visual e correções motoras de precisão cresce exponencialmente, elevando a carga física e cognitiva. Em interfaces baseadas em ponteiro (*mouse* ou *trackpad*), as bordas e cantos do *display* oferecem uma dimensão virtualmente infinita de alvo ($W \to \infty$), uma vez que o cursor é impedido de ultrapassar os limites físicos da tela.
 
 ---
 
 # 3. Gramática de Aplicação Prática (Heurísticas e Anti-padrões)
 
-### Heurísticas de Design
-*   **Maximizar a Hit Area de Elementos Primários:** Aumentar a área clicável real (*touch target* ou *bounding box*) dos botões de ação principal (*Call-to-Action* / *CTA*), adicionando *padding* interno transparente para expandir $W$ sem distorcer o equilíbrio estético visual.
-*   **Minimizar a Distância de Deslocamento ($D$):** Agrupar controles contextuais próximos ao foco visual atual do usuário. Exemplos incluem *radial menus* (pie menus) e *contextual menus* ativados por clique com o botão direito, que reduzem $D$ a um valor próximo de zero.
-*   **Capitalizar nos Cantos da Tela:** Posicionar controles globais vitais (como menus de sistema, botões de início ou ações de navegação principal) nos cantos ou extremidades da interface, aproveitando a propriedade de largura efetiva infinita ($W = \infty$).
-*   **Dimensionamento Ergonômico em Touchscreens:** Respeitar limites mínimos de input tátil (como os padrões de 44x44pt no iOS e 48x48dp no Android), visto que a precisão dos dedos humanos é substancialmente menor do que a de um cursor de mouse.
+### Heurísticas Recomendadas
+- **Expansão de Target Area:** Aumentar a área interativa (*hit area*) para além dos limites visuais rígidos de um ícone ou botão, garantindo dimensões mínimas aceitáveis para facilidade de toque ou clique (ex.: área mínima de 44x44px em interfaces de toque).
+- **Ancoragem em Bordas e Cantos:** Alocar elementos cruciais de navegação ou controle contextual nas extremidades da tela para aproveitar a propriedade de tamanho infinito de alvo em dispositivos de ponteiro.
+- **Proximidade de Fluxo Primário:** Posicionar botões de ação subsequente (como seletores de confirmação ou *call-to-action*) visual e fisicamente próximos do ponto de convergência do cursor ou do foco de atenção do usuário.
 
 ### Anti-padrões
-*   **Tiny Targets:** Links ou botões minúsculos posicionados sem margem de respiro, forçando o usuário a despender alto esforço psicomotor na fase de ajuste fino.
-*   **Disparidade Espacial Entre Ações Dependentes:** Posicionar um botão de confirmação ("Salvar") no extremo oposto de um formulário de dados, exigindo longas trajetórias repetitivas de cursor.
-*   **Cascading Menus Estreitos:** *Dropdown menus* hierárquicos com corredores de navegação extremamente estreitos, que combinam a penalidade da Fitts's Law com limitações de restrição física descritas pela *Steering Law*.
+- **Tiny Target Syndrome:** Interface composta por links de texto ou ícones minúsculos situados em zonas densas, demandando alto esforço de desaceleração e correção motora micrométrica.
+- **Action Displacement:** Posicionamento de botões de alto valor ou ações de confirmação em cantos opostos à área de entrada de dados principal, forçando trajetórias extensas do cursor.
+- **Padrões de Destruição Próximos:** Agrupamento de ações destrutivas (ex.: "Excluir") excessivamente próximas de ações primárias (ex.: "Salvar") com áreas de toque reduzidas, aumentando a incidência de erros motores.
 
 ---
 
 # 4. Métricas e Impacto em Produto
 
-A aplicação direta da Fitts's Law influencia diretamente indicadores quantitativos de eficiência operacional e ergonomia digital:
-
-*   **Task Completion Time (TCT):** A otimização sistemática dos valores de $D$ e $W$ na hierarquia visual reduz diretamente o tempo médio de execução de tarefas críticas.
-*   **Error Rate / Misclick Rate:** Alvos com baixo *Index of Difficulty* (ID) diminuem sensivelmente a taxa de cliques acidentais e seleções errôneas em formulários e transações.
-*   **Throughput (TP):** Mensurado em *bits por segundo* ($bits/s$), representa a métrica padronizada da ISO 9241-9 para avaliar a eficiência biomecânica combinada de dispositivos de input e interfaces de usuário.
-*   **Conversion Rate:** A redução do atrito físico em fluxos de checkout pela expansão visual e tátil do botão de finalização impulsiona as taxas de conversão de produtos e-commerce.
+- **Task Completion Time (TCT):** A otimização do *Index of Difficulty* diminui o tempo total gasto no cumprimento de tarefas críticas dentro da interface.
+- **Error Rate / Misclick Rate:** O dimensionamento adequado de componentes reduz a proporção de cliques ou toques incorretos acidentais, melhorando a precisão da navegação.
+- **Conversion Rate (CR):** A redução da fricção motora em formulários e menus de *checkout* impacta positivamente as taxas de conversão final em produtos digitais.
+- **Throughput (TP):** Métrica padronizada pela norma ISO 9241-9 que avalia o desempenho de entrada de dados relacionando o *Index of Difficulty* com o tempo de resposta do usuário em bits por segundo.
 
 ---
 
 # 5. Referências Cruzadas ([[WikiLinks]]) e Fontes
 
 ### Referências Cruzadas
-*   [[HicksLaw]] — Define a relação entre o tempo de decisão e a quantidade de escolhas cognitivas disponíveis.
-*   [[CognitiveLoad]] — Trata da carga mental global exigida pela interface durante a execução de uma tarefa.
-*   [[SteeringLaw]] — Desdobramento direto da Fitts's Law para movimentos restritos em trajetórias ou canais.
+- [[HicksLaw]]
+- [[CognitiveLoad]]
+- [[VisualHierarchy]]
+- [[JakobsLaw]]
 
-### Fontes Primárias
-*   Fitts, P. M. (1954). *The information capacity of the human motor system in controlling the amplitude of movement*. Journal of Experimental Psychology, 47(6), 381–391.
-*   MacKenzie, I. S. (1992). *Fitts' law as a research and design model in human-computer interaction*. Human-Computer Interaction, 7(1), 91-139.
-*   Yablonski, J. (2020). *Laws of UX: Using Psychology to Design Better Products and Services*. O'Reilly Media.
+### Fontes
+- Fitts, Paul M. (1954). "The information capacity of the human motor system in controlling the amplitude of movement". *Journal of Experimental Psychology*, 47(6), 381–391.
+- ISO 9241-9:2000. *Ergonomics of human-system interaction — Part 9: Requirements for non-keyboard input devices*.
+- Laws of UX (2026). "Fitts’s Law". Disponível em: <https://lawsofux.com/en/fitts-law/>.
