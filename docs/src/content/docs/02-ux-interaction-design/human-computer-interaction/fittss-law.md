@@ -8,86 +8,92 @@ status: "canonical"
 version: "1.0.0"
 created_at: "2026-11-06T00:00:00Z"
 updated_at: "2026-11-06T00:00:00Z"
-summary: "Fitts's Law (Lei de Fitts) é um modelo psicomotor e ergonômico que estabelece que o tempo necessário para alcançar um alvo é uma função logarítmica da distância até ele dividida por sua dimensão física."
+summary: "Modelo psicofísico de desempenho motor que prediz que o tempo necessário para mover um apontador até uma área de destino é uma função da distância ao alvo e inversamente proporcional à sua dimensão."
 tags:
-  - "fittss-law"
-  - "interaction-design"
   - "hci"
-  - "usabilidade"
-  - "ergonomia"
+  - "interaction-design"
+  - "ergonomics"
+  - "usability"
 aliases:
   - "Lei de Fitts"
+  - "Fitts Law"
 academic_anchors:
-  - "Fitts, P. M. (1954) - The information capacity of the human motor system in controlling the amplitude of movement"
-  - "MacKenzie, I. S. (1992) - Fitts' Law as a Research and Design Model in Human-Computer Interaction"
+  - "Fitts, Paul M. (1954) - The Information Capacity of the Human Motor System in Controlling the Amplitude of Movement"
+  - "MacKenzie, I. Scott (1992) - Fitts' Law as a Research and Design Tool in Human-Computer Interaction"
 audit:
   status: "APPROVED"
   auditor: "academic-auditor-v1"
   audited_at: "2026-11-06T00:00:00Z"
   academic_anchor_added: []
 sources:
-  - title: "Laws of UX: Fitts's Law"
+  - title: "Laws of UX: Fitts’s Law"
     url: "https://lawsofux.com/en/fitts-law/"
     type: "article"
     accessed_at: "2026-11-06"
 cross_references:
   - "[[HicksLaw]]"
+  - "[[SteeringLaw]]"
   - "[[CognitiveLoad]]"
-  - "[[TouchTargets]]"
-  - "[[LawOfProximity]]"
 ---
 
 # 1. Definição Canônica
 
-Fitts's Law (Lei de Fitts) é uma equação preditiva do comportamento humano e um princípio fundamental da *Human-Computer Interaction* (HCI) que quantifica o tempo necessário para mover um apontador até uma área de destino interativa. O modelo postula que o tempo de aquisição de um alvo é uma função direta da distância até ele (*distance*) e da sua dimensão (*target size*). Em síntese, alvos menores e mais distantes exigem maior tempo e esforço motor, enquanto alvos maiores e mais próximos são selecionados de forma mais rápida e precisa.
+*Fitts's Law* (Lei de Fitts) é um modelo ergonômico e preditivo da *Human-Computer Interaction* (HCI) formulado pelo psicólogo Paul Fitts em 1954. O modelo estabelece que o tempo necessário para apontar e selecionar um alvo motor é uma função matemática direta da distância necessária para alcançá-lo (*distance*) e uma função inversa da dimensão espacial da área de contato do alvo (*width*).
+
+---
 
 # 2. Fundamentação Teórica e Cognitiva
 
-Formulada em 1954 pelo psicólogo Paul Fitts e posteriormente adaptada para a ciência da computação por Scott MacKenzie e Bill Buxton, a lei fundamenta-se nos princípios da teoria da informação de Shannon. O tempo de movimento (*Movement Time* - MT) é expresso matematicamente pela fórmula:
+A base matemática da *Fitts's Law* é expressa formalmente pela fórmula do *Index of Difficulty* (ID), quantificada em *bits*:
+
+$$ID = \log_2\left(\frac{2D}{W}\right)$$
+
+O tempo de movimento total (*Movement Time* ou MT) é modelado linearmente por:
 
 $$MT = a + b \cdot ID$$
 
-onde $ID$ representa o Índice de Dificuldade (*Index of Difficulty*), calculado como:
+Onde $a$ e $b$ são constantes empíricas derivadas do dispositivo de entrada (*mouse*, *touchscreen*, *trackball*) e do operador humano.
 
-$$ID = \log_2 \left( \frac{2D}{W} \right)$$
+Do ponto de vista neuro-cognitivo e fisiológico, o ato de atingir um alvo espacial divide-se em duas etapas de controle motor:
 
-Nesta relação, $D$ representa a distância física até o centro do alvo, $W$ é a largura (*width*) do alvo ao longo do eixo de deslocamento, e $a$ e $b$ são constantes empíricas associadas ao dispositivo de entrada (como *mouse*, *trackpad* ou *touchscreen*).
+1. **Primary Submovement Phase (Fase Balística):** Um impulso rápido e impreciso executado pelo sistema motor em direção ao vetor geral do alvo, baseado na representação espacial do *mental model*.
+2. **Secondary Submovement Phase (Fase de Controle Fino):** Um ciclo de *visual feedback loop* e correções táticas contínuas de desaceleração para centralizar e ativar o ponteiro dentro dos limites de $W$.
 
-A base neurocognitiva do modelo descreve que a aquisição do alvo ocorre através de duas fases motoras consecutivas:
-1. *Initial Impulse Phase* (Fase Estocástica Primária): Um movimento balístico rápido e de grande amplitude que projeta o cursor na direção geral do objeto.
-2. *Current Control Phase* (Fase de Ajuste Fino): Uma sucessão de correções visuo-motoras de alta precisão para desacelerar e ajustar a posição exata sobre o componente. 
+Em interfaces gráficas de usuário (GUIs), as bordas e cantos do monitor operam como alvos infinitos (*infinite targets*). Como a física do cursor é interrompida pelo limite rígido da tela, a dimensão $W$ tende ao infinito do ponto de vista do vetor de alcance, anulando o risco de *overshoot* e reduzindo o *Index of Difficulty* ao valor mínimo.
 
-Quando a dimensão do alvo reduz, a necessidade de correções micro-motoras aumenta exponencialmente, elevando a carga biomecânica e desacelerando a conclusão da tarefa. Em arranjos de *desktop*, as bordas físicas da tela funcionam como *Infinite Targets* (alvos infinitos), pois o limite da viewport impede o cursor de ultrapassar a área estipulada, anulando a necessidade do ajuste fino de desaceleração.
+---
 
 # 3. Gramática de Aplicação Prática (Heurísticas e Anti-padrões)
 
-### Heurísticas de Design
-- *Target Sizing Generoso*: Expandir a área clicável ou tocável dos componentes de interface. Em interfaces móveis, assegurar uma área mínima de *Touch Target* de 48x48 dp/px.
-- *Proximity Optimization*: Posicionar botões de ação sequenciais ou dependentes imediatamente próximos aos pontos de origem de foco do usuário para mitigar o valor de $D$.
-- *Edge and Corner Positioning*: Alocar elementos interativos críticos ou globais (como menus principais e barras de ação) nas extremidades físicas da tela em layouts desktop para tirar proveito do conceito de *Infinite Target*.
-- *Contextual UI Integration*: Implementar menus contextuais ativados sob o ponteiro (ex.: menus disparados via clique com botão direito ou ações flutuantes no ponto de seleção) para reduzir a distância $D$ a zero.
+### Heurísticas (Boas Práticas)
+* **Target Sizing e Hitboxes Expandidas:** Aumentar a área interativa (*hitbox*) de elementos sem necessariamente alterar a proporção do ícone visual. Garantir dimensões mínimas para toque baseadas nas diretrizes de plataformas (ex.: 48x48 dp no *Material Design* e 44x44 pt nas *Apple Human Interface Guidelines*).
+* **Edge e Corner Placement:** Posicionar elementos operacionais de uso frequente — como barras de navegação, controles globais de sistema ou menus fixos — nas extremidades da tela para tirar proveito da propriedade de alvos infinitos.
+* **Contextual Pop-up Menus:** Exibir menus contextuais (acionados por *right-click* ou *press-and-hold*) diretamente na posição atual do cursor ou do toque, zerando o fator distância ($D = 0$).
+* **Proximidade Operacional:** Agrupar fisicamente botões de validação primária em conjunto com os campos de entrada de dados relacionados, minimizando o *Movement Time* do fluxo.
 
-### Anti-padrões
-- *Micro-Targets*: Utilizar ícones pequenos sem *padding* estendido, tais como botões de fechar modais ou atalhos de exclusão cujas dimensões ativas coincidam exatamente com a sua geometria visual reduzida.
-- *Target Chasing*: Projetar menus suspensos encadeados (*Flyout Menus*) que exigem do usuário a navegação em trajetória contínua por corredores estreitos, onde pequenos desvios desativam o estado do componente.
-- *Destructive Proximity*: Posicionar botões destrutivos irreversíveis adjacentes a elementos de confirmação frequente sem espaçamento adequado ou diferenciação de área interativa.
+### Anti-padrões (Falhas de Design)
+* **Micro Targets:** Botões de ação crítica com *hitboxes* minúsculas posicionados com grande separação espacial em relação à trajetória previsível do usuário.
+* **Spatial Dispersal:** Espalhar etapas sequenciais de uma mesma tarefa por cantos opostos do *viewport*, exigindo movimentos balísticos extensos e repetitivos.
+* **Margens de Borda Destrutivas:** Inserir um espaçamento de *padding* nulo ou reduzido entre um botão interativo crítico e a borda da janela, impedindo a utilização da borda física como delimitador natural de desaceleração.
+
+---
 
 # 4. Métricas e Impacto em Produto
 
-- *Task Completion Time* (TCT): Redução direta no tempo gasto para a execução de fluxos operacionais críticos (ex.: rotas de *checkout* ou preenchimento de formulários).
-- *Error Rate / Misclick Rate*: Diminuição percentual da incidência de toques ou cliques acidentais fora dos limites previstos do componente.
-- *Throughput* (TP): Aumento na taxa de transferência de informação no uso do sistema, medida em bits por segundo ($TP = ID / MT$).
-- *Conversion Rate*: Elevação das taxas de conversão em componentes de *Call to Action* (CTA) decorrente da ampliação do *bounding box* interativo.
+* **Task Completion Time (TCT):** A aplicação rigorosa da *Fitts's Law* reduz diretamente a latência física necessária para concluir fluxos de trabalho transacionais.
+* **Error Rate e Miss-click Ratio:** Maximizar a dimensão $W$ diminui a ocorrência de erros de precisão motora, evitando acionamentos acidentais de elementos adjacentes.
+* **Throughput (TP):** Medida padronizada da norma ISO 9241-9 para quantificar o desempenho de dispositivos de entrada e leiautes de interface, definida em bits por segundo ($TP = ID / MT$).
+* **Friction Index:** Redução da carga de atenção física necessária para navegação, prevenindo o esgotamento motor durante sessões de uso prolongado em ferramentas de produtividade.
+
+---
 
 # 5. Referências Cruzadas ([[WikiLinks]]) e Fontes
 
-### Referências Cruzadas
-- [[HicksLaw]]
-- [[CognitiveLoad]]
-- [[TouchTargets]]
-- [[LawOfProximity]]
+* [[HicksLaw]]
+* [[SteeringLaw]]
+* [[CognitiveLoad]]
 
-### Fontes
-- Fitts, P. M. (1954). *The information capacity of the human motor system in controlling the amplitude of movement*. Journal of Experimental Psychology, 47(6), 381–391.
-- MacKenzie, I. S. (1992). *Fitts' Law as a Research and Design Model in Human-Computer Interaction*. Human-Computer Interaction, 7(1), 91–139.
-- Yablonski, J. (2020). *Laws of UX: Using Psychology to Design Better Products and Services*. O'Reilly Media.
+### Fontes Secundárias e Canônicas
+* FITTS, Paul M. The Information Capacity of the Human Motor System in Controlling the Amplitude of Movement. *Journal of Experimental Psychology*, v. 47, n. 6, p. 381-391, 1954.
+* MACKENZIE, I. Scott. Fitts' Law as a Research and Design Tool in Human-Computer Interaction. *Human-Computer Interaction*, v. 7, n. 1, p. 91-139, 1992.
+* YABLONSKI, Jon. *Laws of UX: Design with Psychology in Mind*. O'Reilly Media, 2020.
