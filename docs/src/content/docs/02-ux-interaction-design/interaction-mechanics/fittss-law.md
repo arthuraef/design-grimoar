@@ -8,11 +8,12 @@ status: "canonical"
 version: "1.0.0"
 created_at: "2026-11-06T00:00:00Z"
 updated_at: "2026-11-06T00:00:00Z"
-summary: "Modelo preditivo do movimento humano que estabelece que o tempo necessário para atingir um alvo é uma função da distância até ele e da sua dimensão física."
+summary: "Fitts's Law estabelece que o tempo necessário para alcançar um alvo é uma função matemática da distância até ele e de sua respectiva dimensão."
 tags:
-  - "usability"
   - "interaction-design"
-  - "ergonomics"
+  - "usabilidade"
+  - "ergonomia"
+  - "fitts-law"
 aliases:
   - "Lei de Fitts"
 academic_anchors:
@@ -28,43 +29,34 @@ sources:
     type: "article"
     accessed_at: "2026-11-06"
 cross_references:
-  - "[[HicksLaw]]"
-  - "[[JakobsLaw]]"
-  - "[[CognitiveLoad]]"
+  - "[[Hick's Law]]"
+  - "[[Cognitive Load]]"
 ---
 
 # 1. Definição Canônica
-**Fitts's Law** (Lei de Fitts) é um princípio ergonômico e um modelo preditivo de *interaction design* que postula que o tempo necessário para selecionar ou alcançar um determinado alvo é determinado pela razão entre a distância total até ele e a dimensão física do próprio alvo. Quanto mais próximo o ponto de controle estiver do elemento interativo e quanto maior for a superfície de aquisição desse elemento, maior será a velocidade e a precisão do movimento executado pelo usuário.
+Fitts's Law (Lei de Fitts) é um princípio preditivo da ergonomia e da interação humano-computador que postula que o tempo necessário para adquirir um alvo (target) através de um dispositivo apontador é uma função direta da distância a ser percorrida até o alvo e inversamente proporcional ao tamanho do próprio alvo. Em termos práticos de design de interface, elementos maiores e mais próximos da posição atual do cursor ou toque humano são ativados com maior velocidade e precisão.
 
 # 2. Fundamentação Teórica e Cognitiva
-Formulada originalmente por Paul Fitts em 1954 no contexto da psicologia experimental e do controle neuromuscular humano, a equação quantifica a capacidade de processamento de informação do sistema psicomotor. Matematicamente expressa através do *Index of Difficulty* (ID), a lei descreve a movimentação motora humana como uma sequência bifurcada de fases:
+Originada no campo da psicologia experimental e da engenharia de fatores humanos através do trabalho pioneiro de Paul M. Fitts em 1954, a lei modela quantitativamente o sistema motor humano. Do ponto de vista cognitivo e biomecânico, o movimento de alcançar um objeto não é um ato unitário, mas um processo de feedback corretivo contínuo. 
 
-1. **Movimento Balístico Inicial:** Um deslocamento rápido e bruto em direção ao objetivo estimado pelo sistema nervoso.
-2. **Ajuste Fino de Precisão:** Correções contínuas impulsionadas pelo *feedback* visual e cinestésico à medida que a extremidade do cursor ou dedo se aproxima das bordas do elemento.
-
-Alvos diminutos ou posicionados a longas distâncias aumentam significativamente o tempo de processamento visual e muscular, forçando o usuário a desacelerar para evitar o *overshooting* (ultrapassar os limites da área interativa). Por outro lado, alvos maiores minimizam a necessidade dessa fase de ajuste fino, aliviando o esforço psicomotor.
+A formulação matemática clássica (frequentemente expressa através do Índice de Dificuldade de Shannon, $ID = \log_2(2D/W)$, onde $D$ é a distância e $W$ é a largura do alvo) demonstra que o custo metabólico e cognitivo-motor aumenta logaritmicamente conforme o alvo se afasta ou se torna exíguo. O cérebro humano despende mais recursos neurais e tempo de processamento para coordenar microajustes motores quando a margem de erro permitida pelas bordas do alvo é reduzida.
 
 # 3. Gramática de Aplicação Prática (Heurísticas e Anti-padrões)
+Para otimizar fluxos de interação digital com base nesta lei, os designers devem aplicar diretrizes estruturais estritas na hierarquia de posicionamento e dimensionamento de elementos interativos:
 
-### Heurísticas de Aplicação:
-* **Maximização do Interactive Hit Target:** Expandir as áreas de toque ou clique para além dos limites estritamente visuais dos ícones e textos através do uso defensivo de *padding*, fornecendo maior margem para acionamentos imprecisos.
-* **Aproveitamento de Bordas e Cantos (Infinite Target Size):** Posicionar elementos críticos de comando nas extremidades da tela de exibições *desktop*, aproveitando o fato de que o cursor físico é detido pela borda do monitor, conferindo virtualmente uma dimensão infinita ao alvo.
-* **Otimização de Trajetória e Proximidade:** Dispor opções complementares e fluxos contextuais imediatos próximos do ponto de origem do ponteiro ou do alcance primário dos polegares em dispositivos móveis.
-
-### Anti-padrões:
-* **Micro-alvos Interativos:** Implementar botões, links ou seletores com dimensões reduzidas (abaixo de 44x44 pixels em telas de *touch*), aumentando a taxa de erro manual.
-* **Dispersão Espacial Sequencial:** Espaçar fisicamente botões de ações sequenciais ou dependentes, obrigando o usuário a realizar percursos extensos e repetitivos no ambiente digital.
+*   **Heurística de Proximidade Crítica:** Posicione ações frequentes ou subsequentes (como botões de confirmação em modais) adjacentes ao local onde o usuário concluiu a ação anterior, minimizando a distância ($D$).
+*   **Heurística de Escala Adequada:** Assegure dimensões de toque e clique generosas ($W$), especialmente em dispositivos móveis, respeitando os limiares ergonômicos recomendados para dedos e cursores.
+*   **Aproveitamento de Cantos e Bordas:** Utilize as extremidades da tela (cantos de monitores em desktops) para elementos críticos (como menus de sistema ou botões de fechar), uma vez que barreiras físicas ou virtuais infinitas reduzem o problema de mira para zero dimensão efetiva.
+*   **Anti-padrão de Alvos Isolados e Minúsculos:** Agrupar ações destrutivas ou de alta frequência (ex: excluir/cancelar) em áreas de difícil acesso visual e motor, distantes do foco primário de leitura do usuário.
+*   **Anti-padrão de Assimetria Escalar:** Projetar botões de CTA primários com tamanhos idênticos ou inferiores a links secundários irrelevantes, violando a proporção de esforço motor esperado.
 
 # 4. Métricas e Impacto em Produto
-A aplicação consistente dos princípios derivados deste modelo afeta diretamente o desempenho operacional em produtos digitais, podendo ser avaliada por:
-* **Task Completion Time:** Diminuição no tempo total demandado para a execução de fluxos e comandos de alta frequência.
-* **Error Rate (Missclick Rate):** Queda percentual no volume de cliques ou toques acidentais fora do *hit target* correto.
-* **Throughput:** Aumento da eficiência e da densidade de interações bem-sucedidas por unidade de tempo sem perda de exatidão.
+A aplicação correta da Lei de Fitts impacta diretamente métricas de usabilidade e performance quantitativa:
+*   **Task Completion Time (Tempo de Conclusão de Tarefa):** Reduz o tempo médio necessário para finalizar fluxos críticos de conversão (checkout, cadastros).
+*   **Error Rate (Taxa de Erro):** Diminui os índices de cliques errados (mis-clicks) ou toques perdidos em interfaces touch, elevando a precisão geral da interação.
+*   **System Usability Scale (SUS):** Melhora a percepção subjetiva de fluidez e facilidade de uso do produto digital.
 
 # 5. Referências Cruzadas ([[WikiLinks]]) e Fontes
-* [[HicksLaw]]
-* [[JakobsLaw]]
-* [[CognitiveLoad]]
-
-### Fontes:
-* [Laws of UX - Fitts's Law](https://lawsofux.com/fittss-law/)
+*   [[Hick's Law]]
+*   [[Cognitive Load]]
+*   [[Jakob's Law]]
